@@ -6,9 +6,10 @@ import requests
 import os
 import json
 import sys
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, BinaryIO
 from pathlib import Path
 import logging
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,46 @@ class GitHubAsset:
     
     def __repr__(self) -> str:
         return f"{self.name} ({self.get_size_mb():.1f} MB)"
+
+
+class ProgressWriter:
+    """Real-time progress writer that bypasses buffering"""
+    
+    def __init__(self):
+        self.last_output = ""
+    
+    def update(self, downloaded: int, total: int, filename: str = ""):
+        """Update progress display with unbuffered output"""
+        if total <= 0:
+            return
+        
+        percent = (downloaded / total) * 100
+        mb_downloaded = downloaded / (1024 * 1024)
+        mb_total = total / (1024 * 1024)
+        
+        # Format: [████████░░░░░░░░░░] 45.2% 23.5/52.1 MB
+        bar_length = 30
+        filled = int(bar_length * downloaded / total)
+        bar = "█" * filled + "░" * (bar_length - filled)
+        
+        progress_line = f"\r[{bar}] {percent:5.1f}% {mb_downloaded:6.1f}/{mb_total:6.1f} MB"
+        
+        # Write directly to raw stdout/stderr to bypass buffering
+        try:
+            # Try using os.write for maximum unbuffered output
+            os.write(2, (progress_line).encode('utf-8', errors='ignore'))
+        except:
+            # Fallback to sys.stderr
+            sys.stderr.write(progress_line)
+            sys.stderr.flush()
+    
+    def finish(self):
+        """Clear progress line"""
+        try:
+            os.write(2, b"\n")
+        except:
+            sys.stderr.write("\n")
+            sys.stderr.flush()
 
 
 class GitHubReleaseManager:
@@ -110,12 +151,12 @@ class GitHubReleaseManager:
         progress_callback=None
     ) -> Tuple[bool, str]:
         """
-        Download asset
+        Download asset with real-time unbuffered progress display
         
         Args:
             asset: Asset to download
             dest_path: Destination path
-            progress_callback: Progress callback function (downloaded, total)
+            progress_callback: Legacy progress callback function (downloaded, total)
             
         Returns:
             (success_flag, message)
@@ -125,9 +166,8 @@ class GitHubReleaseManager:
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             
             logger.info(f"Starting download: {asset.name}")
-            print(f"[DOWNLOAD] {asset.name} ({asset.get_size_mb():.1f} MB)")
             
-            # Send request
+            # Send request with streaming enabled
             response = requests.get(
                 asset.download_url,
                 timeout=self.timeout,
@@ -138,9 +178,15 @@ class GitHubReleaseManager:
             # Get file size
             total_size = int(response.headers.get('content-length', 0))
             
-            # Download file
+            if total_size == 0:
+                logger.warning("Content-Length header not provided, downloading without progress")
+            
+            # Create progress writer
+            progress_writer = ProgressWriter()
+            
+            # Download file with very small chunks for real-time updates
             downloaded = 0
-            chunk_size = 1024 * 1024  # 1MB chunks
+            chunk_size = 64 * 1024  # 64KB chunks for more frequent updates
             
             with open(dest_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=chunk_size):
@@ -148,20 +194,16 @@ class GitHubReleaseManager:
                         f.write(chunk)
                         downloaded += len(chunk)
                         
-                        # Call progress callback
+                        # Update progress display in real-time
+                        if total_size > 0:
+                            progress_writer.update(downloaded, total_size, asset.name)
+                        
+                        # Call legacy progress callback if provided
                         if progress_callback:
                             progress_callback(downloaded, total_size)
-                        
-                        # Print progress with real-time display
-                        if total_size > 0:
-                            percent = (downloaded / total_size) * 100
-                            progress_msg = f"  Progress: {percent:.1f}% ({downloaded / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB)"
-                            sys.stderr.write(progress_msg + '\r')
-                            sys.stderr.flush()
             
-            # Clear progress line after download completes
-            sys.stderr.write(" " * 80 + '\n')
-            sys.stderr.flush()
+            # Clear progress line
+            progress_writer.finish()
             
             logger.info(f"Download complete: {dest_path}")
             return True, f"Download complete: {asset.name}"
