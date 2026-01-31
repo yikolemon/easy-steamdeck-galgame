@@ -9,18 +9,29 @@
 
 ## 🚀 快速安装
 
-### 通过 Flatpak 安装（推荐）
+### 安装依赖
 
 ```bash
-flatpak install flathub io.github.steamdeck_galgame
-flatpak run io.github.steamdeck_galgame
+# 安装所有依赖
+pip install -r requirements.txt
 ```
 
-### 或从源代码运行
+### 运行应用
 
 ```bash
+# 默认启动 TUI 模式（推荐 SteamDeck）
 python3 run.py
+
+# 或者指定 GUI 模式
+python3 run.py --gui
+
+# 显式指定 TUI 模式
+python3 run.py --tui
 ```
+
+**注意**：本项目现已同时支持 **TUI（终端界面）** 和 **GUI（图形界面）** 两种运行方式。
+- **TUI 模式**：无需图形环境，更适合 SteamDeck，直接获得系统权限
+- **GUI 模式**：需要 X11/Wayland 和 Tkinter
 
 ## 功能
 
@@ -43,35 +54,52 @@ python3 run.py
 
 - SteamOS 3.0+（SteamDeck 原装系统）
 - Python 3.7+
-- Tkinter
 - 100MB 磁盘空间
+
+**对于 TUI 模式**：无额外依赖
+
+**对于 GUI 模式**：需要 Tkinter 和图形环境（X11/Wayland）
 
 ## 使用方法
 
-### 第一步：安装 Locale
-1. 打开工具
-2. 点击"📝 中文 Locale"
-3. 点击"▶ 执行"
-4. 等待完成
+### TUI 模式使用（推荐 SteamDeck）
 
-### 第二步：安装字体
-1. 点击"🔤 中文字体"
-2. 选择字体包（GAL_Fonts_Minimal.zip）
-3. 点击"▶ 执行"
-4. 等待完成
+1. 运行应用：`python3 run.py`
+2. 使用数字键选择功能
+3. 按照提示操作
 
-### 第三步：配置游戏
-1. 在 Steam 游戏属性中找到"启动选项"
-2. 从工具复制中文启动命令
-3. 粘贴到启动选项
-4. 保存
+详见 [TUI_USAGE.md](./TUI_USAGE.md)
+
+### GUI 模式使用
+
+1. 运行应用：`python3 run.py --gui`
+2. 使用鼠标点击按钮
+3. 按照提示操作
 
 ## 项目结构
 
-该项目已进行完整的模块化重构，具有清晰的分层架构。详见：
+该项目采用模块化架构，支持 TUI 和 GUI 两种界面：
+
+```
+src/
+├── tui/              # TUI 模块（新增）
+│   ├── __init__.py
+│   └── main.py
+├── ui/               # GUI 模块
+│   ├── main.py
+│   ├── widgets.py
+│   └── ...
+├── core/             # 核心业务逻辑（TUI/GUI 共用）
+│   ├── installers/
+│   └── ...
+└── utils/            # 工具函数（TUI/GUI 共用）
+```
+
+详见：
 
 - 📄 [STRUCTURE.md](./STRUCTURE.md) - 详细项目结构说明
 - 📄 [OPTIMIZATION_REPORT.md](./OPTIMIZATION_REPORT.md) - 优化改进详细分析
+- 📄 [TUI_USAGE.md](./TUI_USAGE.md) - TUI 模式详细说明
 
 ### 快速命令
 
