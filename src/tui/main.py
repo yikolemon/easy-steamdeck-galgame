@@ -23,9 +23,8 @@ from src.core.installers import (
     download_and_install_fonts,
 )
 from src.utils.locale import t, is_chinese
-from src.core.game_launcher import (
-    get_zh_locale_command
-)
+from src.core.game_launcher import get_locale_command
+from src.config import Config, TargetLanguage
 
 
 class TUIApplication:
@@ -34,10 +33,58 @@ class TUIApplication:
     def __init__(self):
         self.console = Console()
         self.running = True
+        self.target_language = None  # Will be set by show_language_selection
     
     def clear_screen(self):
         """Clear screen"""
         os.system('clear' if os.name != 'nt' else 'cls')
+    
+    def show_language_selection(self) -> str:
+        """
+        Show target language selection menu
+        Returns: Selected language code ('zh' or 'ja')
+        """
+        self.clear_screen()
+        
+        # Check if language is already selected
+        saved_lang = Config.get_target_language()
+        if saved_lang:
+            # Show current selection and ask if user wants to change
+            self.console.print(f"\n[cyan]Current target language: {TargetLanguage.get_name(saved_lang, 'zh' if is_chinese() else 'en')}[/cyan]\n")
+            if not Confirm.ask(t('change_lang', '是否更改目标语言？', 'Change target language?')):
+                self.target_language = saved_lang
+                return saved_lang
+        
+        # Show language selection
+        self.console.print(Panel(
+            Text(t('select_target', '选择目标语言 / Select Target Language', 'Select Target Language'), style="bold cyan"),
+            style="bold blue",
+            expand=True
+        ))
+        
+        self.console.print()
+        table = Table(show_header=False, show_footer=False, box=None)
+        table.add_column(style="cyan")
+        
+        if is_chinese():
+            table.add_row("[1] 简体中文 (Simplified Chinese)")
+            table.add_row("[2] 日本語 (Japanese)")
+        else:
+            table.add_row("[1] Simplified Chinese (简体中文)")
+            table.add_row("[2] Japanese (日本語)")
+        
+        self.console.print(table)
+        self.console.print()
+        
+        choice = Prompt.ask(
+            t('select', '请选择', 'Select'),
+            choices=["1", "2"]
+        )
+        
+        lang = TargetLanguage.CHINESE if choice == "1" else TargetLanguage.JAPANESE
+        Config.set_target_language(lang)
+        self.target_language = lang
+        return lang
     
     def print_header(self):
         """Print application header"""
@@ -58,27 +105,33 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
+        # Get target language name for menu (use default if not set)
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
+        
         table = Table(show_header=False, show_footer=False, box=None)
         table.add_column(style="cyan")
         
         if is_chinese():
-            table.add_row("[1] Install Chinese Locale")
-            table.add_row("[2] Install Chinese Fonts")
-            table.add_row("[3] Game Launch Options")
-            table.add_row("[4] System Status")
-            table.add_row("[5] Exit")
+            table.add_row(f"[1] 安装{target_lang_name}语言环境")
+            table.add_row(f"[2] 安装{target_lang_name}字体")
+            table.add_row("[3] 游戏启动选项")
+            table.add_row("[4] 系统状态")
+            table.add_row(f"[5] 更改目标语言 (当前: {target_lang_name})")
+            table.add_row("[6] 退出")
         else:
-            table.add_row("[1] Install Chinese Locale")
-            table.add_row("[2] Install Chinese Fonts")
+            table.add_row(f"[1] Install {target_lang_name} Locale")
+            table.add_row(f"[2] Install {target_lang_name} Fonts")
             table.add_row("[3] Game Launch Options")
             table.add_row("[4] System Status")
-            table.add_row("[5] Exit")
+            table.add_row(f"[5] Change Target Language (Current: {target_lang_name})")
+            table.add_row("[6] Exit")
         
         self.console.print(table)
         self.console.print()
         
         prompt_text = "Select function"
-        choice = Prompt.ask(prompt_text, choices=["1", "2", "3", "4", "5"])
+        choice = Prompt.ask(prompt_text, choices=["1", "2", "3", "4", "5", "6"])
         return choice
     
     def show_locale_menu(self):
@@ -86,53 +139,57 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
+        locale_code = TargetLanguage.get_locale(target_lang)
+        
         if is_chinese():
-            self.console.print("\n[bold cyan]Function 1: Install Chinese Locale[/bold cyan]\n")
+            self.console.print(f"\n[bold cyan]功能 1: 安装{target_lang_name}语言环境[/bold cyan]\n")
             
             # Check current status
-            is_installed = check_locale_status()
+            is_installed = check_locale_status(locale_code)
             status_text = "[green]OK[/green]" if is_installed else "[red]X[/red]"
             
-            self.console.print(f"Status: {status_text}\n")
+            self.console.print(f"状态: {status_text}\n")
             
             if is_installed:
-                self.console.print("[yellow]Locale already installed.[/yellow]\n")
-                Prompt.ask("Press Enter to return", default="")
+                self.console.print(f"[yellow]{target_lang_name}语言环境已安装。[/yellow]\n")
+                Prompt.ask("按回车返回", default="")
                 return
             
-            self.console.print("[cyan]This will:[/cyan]")
-            self.console.print("  1. Disable SteamOS read-only mode")
-            self.console.print("  2. Initialize pacman keys")
-            self.console.print("  3. Enable Simplified Chinese locale (zh_CN.UTF-8)")
-            self.console.print("  4. Generate locale")
-            self.console.print("  5. Restore SteamOS read-only mode\n")
+            self.console.print("[cyan]此操作将:[/cyan]")
+            self.console.print("  1. 禁用 SteamOS 只读模式")
+            self.console.print("  2. 初始化 pacman 密钥")
+            self.console.print(f"  3. 启用{target_lang_name}语言环境 ({locale_code})")
+            self.console.print("  4. 生成语言环境")
+            self.console.print("  5. 恢复 SteamOS 只读模式\n")
             
-            if not Confirm.ask("[yellow]Requires root permission, continue?[/yellow]"):
-                self.console.print("[yellow]Cancelled[/yellow]")
-                Prompt.ask("Press Enter to return", default="")
+            if not Confirm.ask("[yellow]需要 root 权限，是否继续?[/yellow]"):
+                self.console.print("[yellow]已取消[/yellow]")
+                Prompt.ask("按回车返回", default="")
                 return
             
-            self._run_task_with_progress("Installing Chinese Locale", setup_locale)
+            self._run_task_with_progress(f"安装{target_lang_name}语言环境", setup_locale, locale_code)
             
-            Prompt.ask("Press Enter to return", default="")
+            Prompt.ask("按回车返回", default="")
         else:
-            self.console.print("\n[bold cyan]Function 1: Install Chinese Locale[/bold cyan]\n")
+            self.console.print(f"\n[bold cyan]Function 1: Install {target_lang_name} Locale[/bold cyan]\n")
             
             # Check current status
-            is_installed = check_locale_status()
+            is_installed = check_locale_status(locale_code)
             status_text = "[green]OK[/green]" if is_installed else "[red]X[/red]"
             
             self.console.print(f"Status: {status_text}\n")
             
             if is_installed:
-                self.console.print("[yellow]Locale already installed.[/yellow]\n")
+                self.console.print(f"[yellow]{target_lang_name} locale already installed.[/yellow]\n")
                 Prompt.ask("Press Enter to return", default="")
                 return
             
             self.console.print("[cyan]This will:[/cyan]")
             self.console.print("  1. Disable SteamOS read-only mode")
             self.console.print("  2. Initialize pacman keys")
-            self.console.print("  3. Enable Simplified Chinese locale (zh_CN.UTF-8)")
+            self.console.print(f"  3. Enable {target_lang_name} locale ({locale_code})")
             self.console.print("  4. Generate locale")
             self.console.print("  5. Restore SteamOS read-only mode\n")
             
@@ -141,7 +198,7 @@ class TUIApplication:
                 Prompt.ask("Press Enter to return", default="")
                 return
             
-            self._run_task_with_progress("Installing Chinese Locale", setup_locale)
+            self._run_task_with_progress(f"Installing {target_lang_name} Locale", setup_locale, locale_code)
             
             Prompt.ask("Press Enter to return", default="")
     
@@ -279,28 +336,35 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
+        locale_code = TargetLanguage.get_locale(target_lang)
+        
         if is_chinese():
-            self.console.print("\n[bold cyan]System Status[/bold cyan]\n")
+            self.console.print("\n[bold cyan]系统状态[/bold cyan]\n")
             
             table = Table(show_header=True)
-            table.add_column("Function", style="cyan")
-            table.add_column("Status")
+            table.add_column("功能", style="cyan")
+            table.add_column("状态")
+            
+            # Target language
+            table.add_row("目标语言", f"[cyan]{target_lang_name}[/cyan]")
             
             # Locale status
-            locale_installed = check_locale_status()
+            locale_installed = check_locale_status(locale_code)
             locale_status = "[green]OK[/green]" if locale_installed else "[red]X[/red]"
-            table.add_row("Chinese Locale", locale_status)
+            table.add_row(f"{target_lang_name}语言环境", locale_status)
             
             # Font status
             fonts_installed = check_fonts_status()
             fonts_count = get_fonts_count()
             fonts_status = f"[green]OK ({fonts_count})[/green]" if fonts_installed else "[red]X[/red]"
-            table.add_row("Chinese Fonts", fonts_status)
+            table.add_row(f"{target_lang_name}字体", fonts_status)
             
             self.console.print(table)
             self.console.print()
             
-            Prompt.ask("Press Enter to return", default="")
+            Prompt.ask("按回车返回", default="")
         else:
             self.console.print("\n[bold cyan]System Status[/bold cyan]\n")
             
@@ -308,16 +372,19 @@ class TUIApplication:
             table.add_column("Function", style="cyan")
             table.add_column("Status")
             
+            # Target language
+            table.add_row("Target Language", f"[cyan]{target_lang_name}[/cyan]")
+            
             # Check locale status
-            locale_installed = check_locale_status()
+            locale_installed = check_locale_status(locale_code)
             locale_status = "[green]OK[/green]" if locale_installed else "[red]X[/red]"
-            table.add_row("Chinese Locale", locale_status)
+            table.add_row(f"{target_lang_name} Locale", locale_status)
             
             # Check font status
             fonts_installed = check_fonts_status()
             fonts_count = get_fonts_count()
             fonts_status = f"[green]OK ({fonts_count})[/green]" if fonts_installed else "[red]X[/red]"
-            table.add_row("Chinese Fonts", fonts_status)
+            table.add_row(f"{target_lang_name} Fonts", fonts_status)
             
             self.console.print(table)
             self.console.print()
@@ -404,6 +471,9 @@ class TUIApplication:
     
     def run(self):
         """Run application"""
+        # Show language selection at startup
+        self.show_language_selection()
+        
         while self.running:
             choice = self.show_main_menu()
             
@@ -416,6 +486,9 @@ class TUIApplication:
             elif choice == "4":
                 self.show_system_status()
             elif choice == "5":
+                # Change target language
+                self.show_language_selection()
+            elif choice == "6":
                 if is_chinese():
                     self.console.print("\n[cyan]Thank you and goodbye![/cyan]\n")
                 else:
@@ -427,29 +500,32 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
+        
         if is_chinese():
-            self.console.print("\n[bold cyan]Function 3: Game Launch Options[/bold cyan]\n")
+            self.console.print(f"\n[bold cyan]功能 3: {target_lang_name}游戏启动选项[/bold cyan]\n")
             
-            self.console.print("[cyan]Configure game launch environment variables.[/cyan]\n")
+            self.console.print(f"[cyan]配置游戏启动环境变量以使用{target_lang_name}环境。[/cyan]\n")
             
-            self.console.print("[yellow]Launch Command:[/yellow]")
-            self.console.print(get_zh_locale_command() + '\n')
+            self.console.print("[yellow]启动命令:[/yellow]")
+            self.console.print(get_locale_command(target_lang) + '\n')
             
-            self.console.print("[cyan]Steps:[/cyan]")
-            self.console.print("1. Open game properties in Steam")
-            self.console.print("2. Find 'Launch Options' field")
-            self.console.print("3. Paste the command above")
-            self.console.print("4. Save and launch the game\n")
+            self.console.print("[cyan]使用步骤:[/cyan]")
+            self.console.print("1. 在 Steam 中打开游戏属性")
+            self.console.print("2. 找到'启动选项'字段")
+            self.console.print("3. 粘贴上面的命令")
+            self.console.print("4. 保存并启动游戏\n")
             
-            Prompt.ask("Press Enter to return", default="")
+            Prompt.ask("按回车返回", default="")
         else:
-            self.console.print("\n[bold cyan]Function 3: Game Launch Options[/bold cyan]\n")
+            self.console.print(f"\n[bold cyan]Function 3: {target_lang_name} Game Launch Options[/bold cyan]\n")
             
-            self.console.print("[cyan]Configure game launch environment variables.[/cyan]\n")
+            self.console.print(f"[cyan]Configure game launch environment variables for {target_lang_name}.[/cyan]\n")
             
             self.console.print("[yellow]Launch Command:[/yellow]")
 
-            self.console.print(get_zh_locale_command() + '\n')
+            self.console.print(get_locale_command(target_lang) + '\n')
             
             self.console.print("[cyan]Steps:[/cyan]")
             self.console.print("1. Open game properties in Steam")

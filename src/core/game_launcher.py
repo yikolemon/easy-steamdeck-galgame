@@ -9,8 +9,9 @@ from typing import Tuple, List, Dict
 from src.utils import get_home_dir
 from src.config import Config
 
-# Chinese locale launch command constant
+# Locale launch command constants
 ZH_LOCALE_COMMAND = "LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 LC_CTYPE=zh_CN.UTF-8 LC_MESSAGES=zh_CN.UTF-8 LANGUAGE=zh_CN %command%"
+JA_LOCALE_COMMAND = "LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 LC_CTYPE=ja_JP.UTF-8 LC_MESSAGES=ja_JP.UTF-8 LANGUAGE=ja_JP %command%"
 
 
 class GameLauncher:
@@ -130,4 +131,24 @@ def copy_zh_command_to_clipboard() -> bool:
 
 def get_zh_locale_command() -> str:
     """Get Chinese locale launch command"""
+    return ZH_LOCALE_COMMAND
+
+
+def get_ja_locale_command() -> str:
+    """Get Japanese locale launch command"""
+    return JA_LOCALE_COMMAND
+
+
+def get_locale_command(target_lang: str = 'zh') -> str:
+    """
+    Get locale launch command based on target language
+    
+    Args:
+        target_lang: 'zh' for Chinese, 'ja' for Japanese
+        
+    Returns:
+        Locale launch command string
+    """
+    if target_lang == 'ja':
+        return JA_LOCALE_COMMAND
     return ZH_LOCALE_COMMAND

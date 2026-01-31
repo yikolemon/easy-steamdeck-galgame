@@ -175,27 +175,31 @@ def enable_readonly() -> bool:
     return success
 
 
-def is_zh_locale_enabled() -> bool:
+def is_locale_enabled(locale_code: str = 'zh_CN.UTF-8') -> bool:
     """
-    检查系统是否启用/安装了 zh_CN 语言环境。
-    通过清理环境变量并精确解析 locale -a 输出，确保在 PyInstaller 等打包环境下依然准确。
+    Check if a specific locale is enabled/installed on the system.
+    Uses clean environment variables and precise parsing of locale -a output.
+    
+    Args:
+        locale_code: Locale to check (e.g., 'zh_CN.UTF-8', 'ja_JP.UTF-8')
+    
+    Returns:
+        True if locale is enabled, False otherwise
     """
-    # 1. 准备清理后的环境变量
-    # 核心：移除 LD_LIBRARY_PATH，防止子进程加载打包包内错误的 libc 库
-    # 核心：设置 PATH 确保能找到系统命令
+    # 1. Prepare clean environment variables
+    # Remove LD_LIBRARY_PATH to prevent loading wrong libc library in packaged environments
     clean_env = os.environ.copy()
     clean_env.pop('LD_LIBRARY_PATH', None)
     clean_env.pop('PYTHONHOME', None)
     clean_env.pop('PYTHONPATH', None)
 
-    # 2. 定义可能的 locale 命令路径（增强兼容性）
+    # 2. Define possible locale command paths (enhanced compatibility)
     cmd = "locale"
     if os.path.exists("/usr/bin/locale"):
         cmd = "/usr/bin/locale"
 
     try:
-        # 3. 执行 locale -a
-        # 不使用 shell=True 以减少安全风险和 Shell 解析差异
+        # 3. Execute locale -a
         result = subprocess.run(
             [cmd, "-a"],
             env=clean_env,
@@ -206,25 +210,26 @@ def is_zh_locale_enabled() -> bool:
         )
 
         if result.returncode != 0:
-            # 如果报错，通过 stderr 诊断原因（如权限不足或命令缺失）
             logger.error(f"locale -a command failed (exit code {result.returncode}): {result.stderr}")
             return False
 
-        # 4. 规范化解析输出
-        # 将输出按行拆分，转小写并去除首尾空格
+        # 4. Parse output
+        # Split by lines, convert to lowercase and strip whitespace
         installed_locales = [line.strip().lower() for line in result.stdout.splitlines()]
 
-        target = "zh_cn"
+        # Extract the base locale identifier (e.g., 'zh_cn' from 'zh_CN.UTF-8')
+        target = locale_code.split('.')[0].lower()
+        
         for loc in installed_locales:
-            # 匹配逻辑说明：
-            # - loc == "zh_cn": 完全匹配
-            # - loc.startswith("zh_cn."): 匹配 zh_cn.utf8, zh_cn.gbk 等
-            # - loc.startswith("zh_cn@"): 匹配 zh_cn.utf8@pinyin 等特殊变体
+            # Match logic:
+            # - loc == "zh_cn": exact match
+            # - loc.startswith("zh_cn."): matches zh_cn.utf8, zh_cn.gbk, etc.
+            # - loc.startswith("zh_cn@"): matches zh_cn.utf8@pinyin, etc.
             if loc == target or loc.startswith(target + ".") or loc.startswith(target + "@"):
-                logger.debug(f"Detected valid Chinese locale: {loc}")
+                logger.debug(f"Detected valid locale: {loc} (target: {locale_code})")
                 return True
 
-        logger.debug("No zh_CN locale found in system list.")
+        logger.debug(f"No {locale_code} locale found in system list.")
         return False
 
     except FileNotFoundError:
@@ -236,6 +241,17 @@ def is_zh_locale_enabled() -> bool:
     except Exception as e:
         logger.error(f"Unexpected error checking locale: {str(e)}")
         return False
+
+
+def is_zh_locale_enabled() -> bool:
+    """
+    Check if Chinese locale (zh_CN) is enabled on the system.
+    This is a convenience function that calls is_locale_enabled with zh_CN.UTF-8.
+    
+    Deprecated: Use is_locale_enabled('zh_CN.UTF-8') instead.
+    """
+    return is_locale_enabled('zh_CN.UTF-8')
+
 
 def is_fonts_installed() -> bool:
     """Check if fonts are already installed"""

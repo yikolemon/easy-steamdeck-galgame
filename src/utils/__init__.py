@@ -10,6 +10,7 @@ from .system import (
     disable_readonly,
     disable_readonly_if_needed,
     enable_readonly,
+    is_locale_enabled,
     is_zh_locale_enabled,
     is_fonts_installed,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "disable_readonly",
     "disable_readonly_if_needed",
     "enable_readonly",
+    "is_locale_enabled",
     "is_zh_locale_enabled",
     "is_fonts_installed",
     "get_home_dir",
