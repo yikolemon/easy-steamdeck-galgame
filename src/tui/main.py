@@ -23,6 +23,9 @@ from src.core.installers import (
     download_and_install_fonts,
 )
 from src.utils.locale import t, is_chinese
+from src.core.game_launcher import (
+    get_zh_locale_command
+)
 
 
 class TUIApplication:
@@ -430,7 +433,7 @@ class TUIApplication:
             self.console.print("[cyan]Configure game launch environment variables.[/cyan]\n")
             
             self.console.print("[yellow]Launch Command:[/yellow]")
-            self.console.print('LANG=zh_CN.UTF-8 LANGUAGE=zh_CN %command%\n')
+            self.console.print(get_zh_locale_command() + '\n')
             
             self.console.print("[cyan]Steps:[/cyan]")
             self.console.print("1. Open game properties in Steam")
