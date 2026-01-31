@@ -32,19 +32,34 @@ def is_steamos_system() -> bool:
 def is_directory_writable(path: str) -> bool:
     """
     Check if a directory is writable without needing readonly disable.
+    If the directory doesn't exist, check the first existing parent directory.
     Returns True if writable, False if read-only.
     """
-    if not os.path.exists(path):
-        logger.warning(f"Path does not exist: {path}")
-        return False
+    check_path = path
+    
+    # If path doesn't exist, find the first existing parent directory
+    if not os.path.exists(check_path):
+        logger.debug(f"Path does not exist: {check_path}, checking parent directories...")
+        check_path = os.path.dirname(check_path)
+        
+        # Keep going up until we find an existing directory or reach root
+        while check_path and not os.path.exists(check_path):
+            check_path = os.path.dirname(check_path)
+        
+        # If we couldn't find any existing parent, we can't determine writeability
+        if not check_path or not os.path.exists(check_path):
+            logger.warning(f"Could not find any existing parent directory for: {path}")
+            return False
+        
+        logger.debug(f"Checking parent directory instead: {check_path}")
     
     try:
         # Try to create a temporary file in the directory
         import tempfile
-        with tempfile.NamedTemporaryFile(dir=path, delete=True):
+        with tempfile.NamedTemporaryFile(dir=check_path, delete=True):
             return True
     except (OSError, IOError) as e:
-        logger.debug(f"Directory is not writable: {path} - {str(e)}")
+        logger.debug(f"Directory is not writable: {check_path} - {str(e)}")
         return False
 
 
