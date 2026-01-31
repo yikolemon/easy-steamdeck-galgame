@@ -2,8 +2,6 @@
 requests>=2.25.0  # 用于 GitHub API 和文件下载
 rich>=10.0.0      # 用于 TUI 界面
 
-# Python 3.7+ 内置支持 tkinter
-
 # 开发依赖（可选）
 # pytest>=6.0
 # pytest-cov>=2.10

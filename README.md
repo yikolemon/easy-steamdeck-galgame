@@ -42,7 +42,6 @@ chmod +x steamdeck-galgame
 ```
 src/
 ├── tui/               # TUI 界面
-├── ui/                # GUI 界面  
 ├── core/              # 核心业务逻辑
 └── utils/             # 工具函数
 ```

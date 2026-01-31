@@ -209,13 +209,11 @@ pyinstaller \
     --add-data "data/icons:data/icons" \
     --hidden-import=src \
     --hidden-import=src.tui \
-    --hidden-import=src.ui \
     --hidden-import=src.core \
     --hidden-import=src.core.installers \
     --hidden-import=src.utils \
     --hidden-import=requests \
     --hidden-import=rich \
-    --hidden-import=tkinter \
     --strip \
     --clean \
     run.py

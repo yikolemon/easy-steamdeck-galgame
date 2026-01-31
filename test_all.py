@@ -15,7 +15,6 @@ def test_imports():
         ("Rich 库", lambda: __import__('rich')),
         ("Requests 库", lambda: __import__('requests')),
         ("TUI 主程序", lambda: __import__('src.tui.main')),
-        ("GUI 主程序", lambda: __import__('src.ui.main')),
         ("核心安装器", lambda: __import__('src.core.installers')),
         ("工具模块", lambda: __import__('src.utils')),
     ]
@@ -49,7 +48,6 @@ def test_file_structure():
         'requirements.txt',
         'src/tui/__init__.py',
         'src/tui/main.py',
-        'src/ui/main.py',
         'src/core/installers/__init__.py',
         'src/utils/system.py',
     ]
@@ -124,7 +122,6 @@ def main():
         print("✅ 所有测试通过！程序已准备就绪。")
         print("\n运行方式:")
         print("  python3 run.py        # 启动 TUI 模式")
-        print("  python3 run.py --gui  # 启动 GUI 模式")
         return 0
     else:
         print("❌ 某些测试失败。请检查错误信息。")
