@@ -42,7 +42,6 @@ jobs:
             --name steamdeck-galgame \
             --onefile \
             --console \
-            --add-data "data/icons:data/icons" \
             --hidden-import=src \
             --hidden-import=src.tui \
             --hidden-import=src.core \

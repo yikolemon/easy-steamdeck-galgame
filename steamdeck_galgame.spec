@@ -7,12 +7,9 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
-# 收集所有数据文件
-datas = [
-    ('data/icons', 'data/icons'),
-]
+datas = []
 
-# 收集 requests 数据文件（如果需要）
+# Collect requests data files (if needed)
 datas += collect_data_files('requests')
 
 a = Analysis(
@@ -23,12 +20,11 @@ a = Analysis(
     hiddenimports=[
         'src',
         'src.tui',
-        'src.ui',
         'src.core',
+        'src.core.downloader',
         'src.core.installers',
         'src.utils',
         'requests',
-        'tkinter',
     ],
     hookspath=[],
     hooksconfig={},

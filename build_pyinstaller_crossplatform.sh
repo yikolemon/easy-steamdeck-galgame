@@ -206,10 +206,10 @@ pyinstaller \
     --name "$EXECUTABLE_NAME" \
     --onefile \
     --console \
-    --add-data "data/icons:data/icons" \
     --hidden-import=src \
     --hidden-import=src.tui \
     --hidden-import=src.core \
+    --hidden-import=src.core.downloader \
     --hidden-import=src.core.installers \
     --hidden-import=src.utils \
     --hidden-import=requests \
