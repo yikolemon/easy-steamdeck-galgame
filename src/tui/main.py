@@ -25,6 +25,12 @@ from src.core.installers import (
 from src.utils.locale import t, is_chinese
 from src.core.game_launcher import get_locale_command
 from src.config import Config, TargetLanguage
+from src.core.steam_manager import (
+    SteamManager,
+    get_game_search_paths,
+    add_game_search_path,
+    remove_game_search_path,
+)
 
 
 class TUIApplication:
@@ -116,22 +122,24 @@ class TUIApplication:
             table.add_row(f"[1] 安装{target_lang_name}语言环境")
             table.add_row(f"[2] 安装{target_lang_name}字体")
             table.add_row("[3] 游戏启动选项")
-            table.add_row("[4] 系统状态")
-            table.add_row(f"[5] 更改目标语言 (当前: {target_lang_name})")
-            table.add_row("[6] 退出")
+            table.add_row("[4] 添加非Steam游戏到Steam库")
+            table.add_row("[5] 系统状态")
+            table.add_row(f"[6] 更改目标语言 (当前: {target_lang_name})")
+            table.add_row("[7] 退出")
         else:
             table.add_row(f"[1] Install {target_lang_name} Locale")
             table.add_row(f"[2] Install {target_lang_name} Fonts")
             table.add_row("[3] Game Launch Options")
-            table.add_row("[4] System Status")
-            table.add_row(f"[5] Change Target Language (Current: {target_lang_name})")
-            table.add_row("[6] Exit")
+            table.add_row("[4] Add Non-Steam Game to Steam")
+            table.add_row("[5] System Status")
+            table.add_row(f"[6] Change Target Language (Current: {target_lang_name})")
+            table.add_row("[7] Exit")
         
         self.console.print(table)
         self.console.print()
         
         prompt_text = "Select function"
-        choice = Prompt.ask(prompt_text, choices=["1", "2", "3", "4", "5", "6"])
+        choice = Prompt.ask(prompt_text, choices=["1", "2", "3", "4", "5", "6", "7"])
         return choice
     
     def show_locale_menu(self):
@@ -523,6 +531,307 @@ class TUIApplication:
             
             Prompt.ask("Press Enter to return", default="")
     
+    def show_add_game_menu(self):
+        """Show add non-Steam game menu"""
+        self.clear_screen()
+        self.print_header()
+        
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
+        
+        if is_chinese():
+            self.console.print(f"\n[bold cyan]功能 4: 添加非Steam游戏[/bold cyan]\n")
+            
+            self.console.print("[cyan]选择操作:[/cyan]")
+            self.console.print("[1] 管理游戏搜索路径")
+            self.console.print("[2] 浏览并添加游戏")
+            self.console.print("[3] 返回主菜单\n")
+        else:
+            self.console.print(f"\n[bold cyan]Function 4: Add Non-Steam Game[/bold cyan]\n")
+            
+            self.console.print("[cyan]Select action:[/cyan]")
+            self.console.print("[1] Manage game search paths")
+            self.console.print("[2] Browse and add game")
+            self.console.print("[3] Return to main menu\n")
+        
+        choice = Prompt.ask("选择" if is_chinese() else "Select", choices=["1", "2", "3"])
+        
+        if choice == "1":
+            self._manage_game_search_paths()
+        elif choice == "2":
+            self._browse_and_add_game()
+    
+    def _manage_game_search_paths(self):
+        """Manage game search paths"""
+        while True:
+            self.clear_screen()
+            self.print_header()
+            
+            if is_chinese():
+                self.console.print("\n[bold cyan]管理游戏搜索路径[/bold cyan]\n")
+            else:
+                self.console.print("\n[bold cyan]Manage Game Search Paths[/bold cyan]\n")
+            
+            paths = get_game_search_paths()
+            
+            if paths:
+                table = Table(show_header=True)
+                table.add_column("编号" if is_chinese() else "No.", style="cyan")
+                table.add_column("路径" if is_chinese() else "Path")
+                
+                for idx, path in enumerate(paths, 1):
+                    table.add_row(str(idx), path)
+                
+                self.console.print(table)
+                self.console.print()
+            else:
+                self.console.print("[yellow]没有配置的搜索路径[/yellow]\n" if is_chinese() else "[yellow]No configured search paths[/yellow]\n")
+            
+            if is_chinese():
+                self.console.print("[cyan]选择操作:[/cyan]")
+                self.console.print("[1] 添加新路径")
+                self.console.print("[2] 删除路径")
+                self.console.print("[3] 返回\n")
+            else:
+                self.console.print("[cyan]Select action:[/cyan]")
+                self.console.print("[1] Add new path")
+                self.console.print("[2] Remove path")
+                self.console.print("[3] Return\n")
+            
+            choice = Prompt.ask("选择" if is_chinese() else "Select", choices=["1", "2", "3"])
+            
+            if choice == "1":
+                new_path = Prompt.ask("输入路径" if is_chinese() else "Enter path")
+                success, msg = add_game_search_path(new_path)
+                if success:
+                    self.console.print(f"[green]✓ {msg}[/green]")
+                else:
+                    self.console.print(f"[red]X {msg}[/red]")
+                Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+            elif choice == "2":
+                if not paths:
+                    self.console.print("[yellow]没有路径可删除[/yellow]" if is_chinese() else "[yellow]No paths to remove[/yellow]")
+                    Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+                    continue
+                
+                choices = [str(i) for i in range(1, len(paths) + 1)] + ['0']
+                idx_choice = Prompt.ask("选择要删除的路径 (0=取消)" if is_chinese() else "Select path to remove (0=Cancel)", choices=choices)
+                
+                if idx_choice != '0':
+                    path_to_remove = paths[int(idx_choice) - 1]
+                    success, msg = remove_game_search_path(path_to_remove)
+                    if success:
+                        self.console.print(f"[green]✓ {msg}[/green]")
+                    else:
+                        self.console.print(f"[red]X {msg}[/red]")
+                    Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+            elif choice == "3":
+                break
+    
+    def _browse_and_add_game(self):
+        """Browse directories and add game to Steam"""
+        self.clear_screen()
+        self.print_header()
+        
+        target_lang = self.target_language or Config.get_target_language()
+        
+        # Get search paths
+        paths = get_game_search_paths()
+        
+        if not paths:
+            if is_chinese():
+                self.console.print("\n[yellow]请先配置游戏搜索路径[/yellow]\n")
+            else:
+                self.console.print("\n[yellow]Please configure game search paths first[/yellow]\n")
+            Prompt.ask("按回车返回" if is_chinese() else "Press Enter to return", default="")
+            return
+        
+        # Let user select search path
+        if is_chinese():
+            self.console.print("\n[cyan]选择搜索路径:[/cyan]\n")
+        else:
+            self.console.print("\n[cyan]Select search path:[/cyan]\n")
+        
+        table = Table(show_header=True)
+        table.add_column("编号" if is_chinese() else "No.", style="cyan")
+        table.add_column("路径" if is_chinese() else "Path")
+        
+        for idx, path in enumerate(paths, 1):
+            table.add_row(str(idx), path)
+        
+        self.console.print(table)
+        self.console.print()
+        
+        choices = [str(i) for i in range(1, len(paths) + 1)] + ['0']
+        path_choice = Prompt.ask("选择路径 (0=取消)" if is_chinese() else "Select path (0=Cancel)", choices=choices)
+        
+        if path_choice == '0':
+            return
+        
+        selected_path = paths[int(path_choice) - 1]
+        
+        # Browse directory
+        current_path = selected_path
+        
+        while True:
+            self.clear_screen()
+            self.print_header()
+            
+            if is_chinese():
+                self.console.print(f"\n[cyan]当前路径: {current_path}[/cyan]\n")
+            else:
+                self.console.print(f"\n[cyan]Current path: {current_path}[/cyan]\n")
+            
+            subdirs, exe_files = SteamManager.browse_directory(current_path)
+            
+            # Display directories
+            if subdirs:
+                if is_chinese():
+                    self.console.print("[bold]文件夹:[/bold]")
+                else:
+                    self.console.print("[bold]Folders:[/bold]")
+                
+                dir_table = Table(show_header=True)
+                dir_table.add_column("编号" if is_chinese() else "No.", style="cyan")
+                dir_table.add_column("名称" if is_chinese() else "Name")
+                
+                for idx, subdir in enumerate(subdirs, 1):
+                    dir_table.add_row(f"D{idx}", subdir)
+                
+                self.console.print(dir_table)
+                self.console.print()
+            
+            # Display exe files
+            if exe_files:
+                if is_chinese():
+                    self.console.print("[bold]可执行文件:[/bold]")
+                else:
+                    self.console.print("[bold]Executable files:[/bold]")
+                
+                exe_table = Table(show_header=True)
+                exe_table.add_column("编号" if is_chinese() else "No.", style="cyan")
+                exe_table.add_column("名称" if is_chinese() else "Name")
+                
+                for idx, exe in enumerate(exe_files, 1):
+                    exe_table.add_row(f"E{idx}", exe)
+                
+                self.console.print(exe_table)
+                self.console.print()
+            
+            if not subdirs and not exe_files:
+                self.console.print("[yellow]空目录[/yellow]\n" if is_chinese() else "[yellow]Empty directory[/yellow]\n")
+            
+            # Prompt for action
+            if is_chinese():
+                self.console.print("[cyan]操作:[/cyan]")
+                self.console.print("  输入 D# 进入文件夹")
+                self.console.print("  输入 E# 选择可执行文件")
+                self.console.print("  输入 .. 返回上级目录")
+                self.console.print("  输入 0 取消\n")
+            else:
+                self.console.print("[cyan]Actions:[/cyan]")
+                self.console.print("  Enter D# to enter folder")
+                self.console.print("  Enter E# to select executable")
+                self.console.print("  Enter .. to go up")
+                self.console.print("  Enter 0 to cancel\n")
+            
+            user_input = Prompt.ask("选择" if is_chinese() else "Select")
+            
+            if user_input == '0':
+                return
+            elif user_input == '..':
+                # Go up one directory
+                parent = os.path.dirname(current_path)
+                if parent and parent != current_path:
+                    current_path = parent
+                else:
+                    if is_chinese():
+                        self.console.print("[yellow]已经在根目录[/yellow]")
+                    else:
+                        self.console.print("[yellow]Already at root[/yellow]")
+                    Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+            elif user_input.upper().startswith('D'):
+                # Enter directory
+                try:
+                    idx = int(user_input[1:])
+                    if 1 <= idx <= len(subdirs):
+                        current_path = os.path.join(current_path, subdirs[idx - 1])
+                    else:
+                        self.console.print("[red]无效选择[/red]" if is_chinese() else "[red]Invalid selection[/red]")
+                        Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+                except:
+                    self.console.print("[red]无效输入[/red]" if is_chinese() else "[red]Invalid input[/red]")
+                    Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+            elif user_input.upper().startswith('E'):
+                # Select exe file
+                try:
+                    idx = int(user_input[1:])
+                    if 1 <= idx <= len(exe_files):
+                        selected_exe = exe_files[idx - 1]
+                        exe_path = os.path.join(current_path, selected_exe)
+                        
+                        # Add game
+                        self._add_game_to_steam(exe_path, target_lang)
+                        return
+                    else:
+                        self.console.print("[red]无效选择[/red]" if is_chinese() else "[red]Invalid selection[/red]")
+                        Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+                except:
+                    self.console.print("[red]无效输入[/red]" if is_chinese() else "[red]Invalid input[/red]")
+                    Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+            else:
+                self.console.print("[red]无效输入[/red]" if is_chinese() else "[red]Invalid input[/red]")
+                Prompt.ask("按回车继续" if is_chinese() else "Press Enter to continue", default="")
+    
+    def _add_game_to_steam(self, exe_path: str, target_lang: str):
+        """Add selected game to Steam"""
+        self.clear_screen()
+        self.print_header()
+        
+        # Get default game name from exe filename
+        default_name = os.path.splitext(os.path.basename(exe_path))[0]
+        
+        if is_chinese():
+            self.console.print(f"\n[cyan]添加游戏到Steam[/cyan]\n")
+            self.console.print(f"可执行文件: [yellow]{exe_path}[/yellow]\n")
+            game_name = Prompt.ask("输入游戏名称", default=default_name)
+        else:
+            self.console.print(f"\n[cyan]Add Game to Steam[/cyan]\n")
+            self.console.print(f"Executable: [yellow]{exe_path}[/yellow]\n")
+            game_name = Prompt.ask("Enter game name", default=default_name)
+        
+        # Generate launch options with target language
+        launch_options = get_locale_command(target_lang)
+        
+        if is_chinese():
+            self.console.print(f"\n启动选项: [cyan]{launch_options}[/cyan]\n")
+            
+            if not Confirm.ask("[yellow]确认添加到Steam?[/yellow]"):
+                self.console.print("[yellow]已取消[/yellow]")
+                Prompt.ask("按回车返回", default="")
+                return
+        else:
+            self.console.print(f"\nLaunch options: [cyan]{launch_options}[/cyan]\n")
+            
+            if not Confirm.ask("[yellow]Confirm add to Steam?[/yellow]"):
+                self.console.print("[yellow]Cancelled[/yellow]")
+                Prompt.ask("Press Enter to return", default="")
+                return
+        
+        # Add to Steam
+        success, msg = SteamManager.add_non_steam_game(
+            exe_path=exe_path,
+            app_name=game_name,
+            launch_options=launch_options
+        )
+        
+        if success:
+            self.console.print(f"[green]✓ {msg}[/green]")
+        else:
+            self.console.print(f"[red]X {msg}[/red]")
+        
+        Prompt.ask("按回车返回" if is_chinese() else "Press Enter to return", default="")
+    
     def _run_task_with_progress(self, task_name: str, task_func, *args):
         """Run task and display progress"""
         self.clear_screen()
@@ -616,11 +925,13 @@ class TUIApplication:
             elif choice == "3":
                 self.show_game_launcher_menu()
             elif choice == "4":
-                self.show_system_status()
+                self.show_add_game_menu()
             elif choice == "5":
+                self.show_system_status()
+            elif choice == "6":
                 # Change target language
                 self.show_language_selection()
-            elif choice == "6":
+            elif choice == "7":
                 if is_chinese():
                     self.console.print("\n[cyan]Thank you and goodbye![/cyan]\n")
                 else:
