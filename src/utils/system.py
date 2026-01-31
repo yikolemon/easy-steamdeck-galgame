@@ -176,19 +176,66 @@ def enable_readonly() -> bool:
 
 
 def is_zh_locale_enabled() -> bool:
-    """Check if zh_CN.UTF-8 locale is enabled"""
+    """
+    检查系统是否启用/安装了 zh_CN 语言环境。
+    通过清理环境变量并精确解析 locale -a 输出，确保在 PyInstaller 等打包环境下依然准确。
+    """
+    # 1. 准备清理后的环境变量
+    # 核心：移除 LD_LIBRARY_PATH，防止子进程加载打包包内错误的 libc 库
+    # 核心：设置 PATH 确保能找到系统命令
+    clean_env = os.environ.copy()
+    clean_env.pop('LD_LIBRARY_PATH', None)
+    clean_env.pop('PYTHONHOME', None)
+    clean_env.pop('PYTHONPATH', None)
+
+    # 2. 定义可能的 locale 命令路径（增强兼容性）
+    cmd = "locale"
+    if os.path.exists("/usr/bin/locale"):
+        cmd = "/usr/bin/locale"
+
     try:
+        # 3. 执行 locale -a
+        # 不使用 shell=True 以减少安全风险和 Shell 解析差异
         result = subprocess.run(
-            "locale -a | grep -q zh_CN",
-            shell=True,
+            [cmd, "-a"],
+            env=clean_env,
             capture_output=True,
+            text=True,
+            timeout=5,
             check=False
         )
-        return result.returncode == 0
-    except Exception as e:
-        logger.error(f"Error checking locale: {str(e)}")
+
+        if result.returncode != 0:
+            # 如果报错，通过 stderr 诊断原因（如权限不足或命令缺失）
+            logger.error(f"locale -a command failed (exit code {result.returncode}): {result.stderr}")
+            return False
+
+        # 4. 规范化解析输出
+        # 将输出按行拆分，转小写并去除首尾空格
+        installed_locales = [line.strip().lower() for line in result.stdout.splitlines()]
+
+        target = "zh_cn"
+        for loc in installed_locales:
+            # 匹配逻辑说明：
+            # - loc == "zh_cn": 完全匹配
+            # - loc.startswith("zh_cn."): 匹配 zh_cn.utf8, zh_cn.gbk 等
+            # - loc.startswith("zh_cn@"): 匹配 zh_cn.utf8@pinyin 等特殊变体
+            if loc == target or loc.startswith(target + ".") or loc.startswith(target + "@"):
+                logger.debug(f"Detected valid Chinese locale: {loc}")
+                return True
+
+        logger.debug("No zh_CN locale found in system list.")
         return False
 
+    except FileNotFoundError:
+        logger.error("The 'locale' command was not found on this system.")
+        return False
+    except subprocess.TimeoutExpired:
+        logger.error("Checking locale timed out.")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error checking locale: {str(e)}")
+        return False
 
 def is_fonts_installed() -> bool:
     """Check if fonts are already installed"""
