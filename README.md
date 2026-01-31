@@ -101,7 +101,7 @@ src/
 - 📄 [OPTIMIZATION_REPORT.md](./OPTIMIZATION_REPORT.md) - 优化改进详细分析
 - 📄 [TUI_USAGE.md](./TUI_USAGE.md) - TUI 模式详细说明
 
-### 快速命令
+## 快速命令
 
 ```bash
 python3 run.py          # 运行应用
@@ -111,6 +111,19 @@ make lint               # 代码检查
 make format             # 代码格式化
 make clean              # 清理临时文件
 ```
+
+## 📦 Linux 打包
+
+项目支持打包成 **AppImage** 格式，可在任何 Linux 系统上直接运行：
+
+```bash
+# 打包成 AppImage（推荐 SteamDeck）
+bash build_linux_package.sh
+
+# 输出：dist/steamdeck-galgame-1.0.0-x86_64.AppImage
+```
+
+详见 [LINUX_PACKAGING.md](./LINUX_PACKAGING.md)
 
 ## 许可证
 
