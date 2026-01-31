@@ -22,6 +22,7 @@ from src.core.installers import (
     list_available_fonts,
     download_and_install_fonts,
 )
+from src.utils.locale import get_detector, is_chinese_supported, is_utf8_supported
 
 
 class TUIApplication:
@@ -30,6 +31,44 @@ class TUIApplication:
     def __init__(self):
         self.console = Console()
         self.running = True
+        self.locale_detector = get_detector()
+        
+        # 检查中文支持并警告用户
+        if not is_chinese_supported():
+            self._show_locale_warning()
+    
+    def _show_locale_warning(self):
+        """显示 locale 不可用的警告"""
+        self.console.clear()
+        
+        warning_panel = Panel(
+            "[bold yellow]⚠️  Chinese Locale Not Detected[/bold yellow]",
+            style="yellow",
+            expand=True
+        )
+        self.console.print(warning_panel)
+        
+        self.console.print("\n[yellow]Current System Locale:[/yellow]")
+        self.console.print(f"  LANG: {self.locale_detector.current_locale}")
+        self.console.print(f"  UTF-8 Support: {'Yes' if is_utf8_supported() else 'No'}")
+        self.console.print(f"  Character Mode: {'UTF-8' if self.locale_detector.char_set == 'utf8' else 'ASCII'}")
+        
+        self.console.print("\n[cyan]Why is this important?[/cyan]")
+        self.console.print("  • Chinese characters will not display correctly")
+        self.console.print("  • Game launcher may show garbled text")
+        self.console.print("  • Fonts may not render properly")
+        
+        self.console.print("\n[cyan]To fix this, run:[/cyan]")
+        self.console.print("  [yellow]1. sudo pacman -S glibc-locales[/yellow]")
+        self.console.print("  [yellow]2. sudo locale-gen zh_CN.UTF-8[/yellow]")
+        self.console.print("  [yellow]3. export LANG=zh_CN.UTF-8[/yellow]")
+        self.console.print("  [yellow]4. Restart this application[/yellow]")
+        
+        self.console.print("\n[cyan]Or use this shortcut on SteamDeck:[/cyan]")
+        self.console.print("  [yellow]LANG=zh_CN.UTF-8 python3 run.py[/yellow]")
+        
+        self.console.print()
+        Prompt.ask("Press Enter to continue anyway", default="")
     
     def clear_screen(self):
         """清空屏幕"""
@@ -53,19 +92,24 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
+        check = self.locale_detector.get_char('check')
+        cross = self.locale_detector.get_char('cross')
+        warning = self.locale_detector.get_char('warning')
+        arrow = self.locale_detector.get_char('arrow')
+        
         table = Table(show_header=False, show_footer=False, box=None)
         table.add_column(style="cyan")
         
-        table.add_row("[1] 📝 中文 Locale 安装")
-        table.add_row("[2] 🔤 中文字体安装")
-        table.add_row("[3] 🎮 游戏启动选项配置")
-        table.add_row("[4] 📊 查看系统状态")
-        table.add_row("[5] ❌ 退出程序")
+        table.add_row(f"[1] {check if is_chinese_supported() else cross} Chinese Locale Setup")
+        table.add_row(f"[2] {check if is_chinese_supported() else cross} Chinese Fonts Setup")
+        table.add_row(f"[3] {arrow} Game Launch Options")
+        table.add_row(f"[4] {check} System Status")
+        table.add_row(f"[5] Exit")
         
         self.console.print(table)
         self.console.print()
         
-        choice = Prompt.ask("请选择功能", choices=["1", "2", "3", "4", "5"])
+        choice = Prompt.ask("Select function", choices=["1", "2", "3", "4", "5"])
         return choice
     
     def show_locale_menu(self):
@@ -73,34 +117,38 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
-        self.console.print("\n[bold cyan]功能 1: 中文 Locale 安装[/bold cyan]\n")
+        check = self.locale_detector.get_char('check')
+        cross = self.locale_detector.get_char('cross')
+        warning = self.locale_detector.get_char('warning')
+        
+        self.console.print(f"\n[bold cyan]Function 1: Chinese Locale Setup[/bold cyan]\n")
         
         # 检查当前状态
         is_installed = check_locale_status()
-        status_text = "[green]✓ 已安装[/green]" if is_installed else "[red]✗ 未安装[/red]"
+        status_text = f"[green]{check} Installed[/green]" if is_installed else f"[red]{cross} Not Installed[/red]"
         
-        self.console.print(f"当前状态: {status_text}\n")
+        self.console.print(f"Status: {status_text}\n")
         
         if is_installed:
-            self.console.print("[yellow]⚠️  Locale 已安装，无需重复安装。[/yellow]\n")
-            Prompt.ask("按 Enter 返回主菜单", default="")
+            self.console.print(f"[yellow]{warning} Locale already installed, no need to repeat.[/yellow]\n")
+            Prompt.ask("Press Enter to return", default="")
             return
         
-        self.console.print("[cyan]此功能将：[/cyan]")
-        self.console.print("  1. 关闭 SteamOS 只读模式")
-        self.console.print("  2. 初始化 pacman 密钥")
-        self.console.print("  3. 启用简体中文 locale (zh_CN.UTF-8)")
-        self.console.print("  4. 生成 locale")
-        self.console.print("  5. 恢复 SteamOS 只读模式\n")
+        self.console.print("[cyan]This function will:[/cyan]")
+        self.console.print("  1. Disable SteamOS read-only mode")
+        self.console.print("  2. Initialize pacman keys")
+        self.console.print("  3. Enable Simplified Chinese locale (zh_CN.UTF-8)")
+        self.console.print("  4. Generate locale")
+        self.console.print("  5. Restore SteamOS read-only mode\n")
         
-        if not Confirm.ask("[yellow]需要获取 root 权限，是否继续？[/yellow]"):
-            self.console.print("[yellow]已取消操作[/yellow]")
-            Prompt.ask("按 Enter 返回主菜单", default="")
+        if not Confirm.ask("[yellow]Need root permissions, continue?[/yellow]"):
+            self.console.print("[yellow]Operation cancelled[/yellow]")
+            Prompt.ask("Press Enter to return", default="")
             return
         
-        self._run_task_with_progress("安装中文 Locale", setup_locale)
+        self._run_task_with_progress("Installing Chinese Locale", setup_locale)
         
-        Prompt.ask("按 Enter 返回主菜单", default="")
+        Prompt.ask("Press Enter to return", default="")
     
     def show_font_menu(self):
         """显示字体菜单"""
@@ -205,27 +253,41 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
-        self.console.print("\n[bold cyan]系统状态[/bold cyan]\n")
+        self.console.print("\n[bold cyan]System Status[/bold cyan]\n")
         
         table = Table(show_header=True)
-        table.add_column("功能", style="cyan")
-        table.add_column("状态")
+        table.add_column("Function", style="cyan")
+        table.add_column("Status")
+        
+        check = self.locale_detector.get_char('check')
+        cross = self.locale_detector.get_char('cross')
         
         # Locale 状态
         locale_installed = check_locale_status()
-        locale_status = "[green]✓ 已安装[/green]" if locale_installed else "[red]✗ 未安装[/red]"
-        table.add_row("中文 Locale", locale_status)
+        locale_status = f"[green]{check} Installed[/green]" if locale_installed else f"[red]{cross} Not Installed[/red]"
+        table.add_row("Chinese Locale", locale_status)
         
         # 字体状态
         fonts_installed = check_fonts_status()
         fonts_count = get_fonts_count()
-        fonts_status = f"[green]✓ 已安装 ({fonts_count} 个)[/green]" if fonts_installed else "[red]✗ 未安装[/red]"
-        table.add_row("中文字体", fonts_status)
+        fonts_status = f"[green]{check} Installed ({fonts_count})[/green]" if fonts_installed else f"[red]{cross} Not Installed[/red]"
+        table.add_row("Chinese Fonts", fonts_status)
+        
+        # Locale 检测信息
+        locale_info = self.locale_detector.get_status_info()
+        table.add_row("System LANG", locale_info['locale'])
+        table.add_row("UTF-8 Support", locale_info['supports_utf8'])
+        table.add_row("Display Mode", locale_info['char_set'])
         
         self.console.print(table)
         self.console.print()
         
-        Prompt.ask("按 Enter 返回主菜单", default="")
+        # 如果没有中文支持，显示建议
+        if not is_chinese_supported():
+            self.console.print("[yellow]Tip: Chinese locale not detected. Install it to display Chinese properly.[/yellow]")
+            self.console.print("[cyan]Run: sudo pacman -S glibc-locales && sudo locale-gen zh_CN.UTF-8[/cyan]\n")
+        
+        Prompt.ask("Press Enter to return to main menu", default="")
     
     def _run_task_with_progress(self, task_name: str, task_func, *args):
         """运行任务并显示进度"""
