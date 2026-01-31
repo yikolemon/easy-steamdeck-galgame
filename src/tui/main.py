@@ -448,7 +448,8 @@ class TUIApplication:
             self.console.print("[cyan]Configure game launch environment variables.[/cyan]\n")
             
             self.console.print("[yellow]Launch Command:[/yellow]")
-            self.console.print('LANG=zh_CN.UTF-8 LANGUAGE=zh_CN %command%\n')
+
+            self.console.print(get_zh_locale_command() + '\n')
             
             self.console.print("[cyan]Steps:[/cyan]")
             self.console.print("1. Open game properties in Steam")
