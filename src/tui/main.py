@@ -207,41 +207,51 @@ class TUIApplication:
         self.clear_screen()
         self.print_header()
         
-        if is_chinese():
-            self.console.print("\n[bold cyan]Function 2: Install Chinese Fonts[/bold cyan]\n")
-            
-            # Check current status
-            is_installed = check_fonts_status()
-            count = get_fonts_count()
-            status_text = f"[green]OK ({count})[/green]" if is_installed else "[red]X[/red]"
-            
-            self.console.print(f"Status: {status_text}\n")
-            
-            self.console.print("[cyan]Select installation method:[/cyan]")
-            self.console.print("[1] Download from GitHub")
-            self.console.print("[2] Use local font package")
-            self.console.print("[3] Return to menu\n")
-        else:
-            self.console.print("\n[bold cyan]Function 2: Install Chinese Fonts[/bold cyan]\n")
-            
-            # Check current status
-            is_installed = check_fonts_status()
-            count = get_fonts_count()
-            status_text = f"[green]OK ({count})[/green]" if is_installed else "[red]X[/red]"
-            
-            self.console.print(f"Status: {status_text}\n")
-            
-            self.console.print("[cyan]Select installation method:[/cyan]")
-            self.console.print("[1] Download from GitHub")
-            self.console.print("[2] Use local font package")
-            self.console.print("[3] Return to menu\n")
+        target_lang = self.target_language or Config.get_target_language()
+        target_lang_name = TargetLanguage.get_name(target_lang, 'zh' if is_chinese() else 'en')
         
-        choice = Prompt.ask("Select" if is_chinese() else "Select", choices=["1", "2", "3"])
+        # Check current status
+        is_installed = check_fonts_status()
+        count = get_fonts_count()
+        status_text = f"[green]OK ({count})[/green]" if is_installed else "[red]X[/red]"
+        
+        # Check if default font path is configured
+        default_path = Config.get_default_font_path()
+        default_path_info = f"[cyan]{default_path}[/cyan]" if default_path else "[yellow]Not configured[/yellow]"
+        
+        if is_chinese():
+            self.console.print(f"\n[bold cyan]功能 2: 安装{target_lang_name}字体[/bold cyan]\n")
+            self.console.print(f"状态: {status_text}")
+            self.console.print(f"默认字体路径: {default_path_info}\n")
+            
+            self.console.print("[cyan]选择安装方式:[/cyan]")
+            self.console.print("[1] 从 GitHub 下载")
+            self.console.print("[2] 使用本地字体包（手动输入路径）")
+            self.console.print("[3] 从默认字体路径选择")
+            self.console.print("[4] 设置默认字体路径")
+            self.console.print("[5] 返回主菜单\n")
+        else:
+            self.console.print(f"\n[bold cyan]Function 2: Install {target_lang_name} Fonts[/bold cyan]\n")
+            self.console.print(f"Status: {status_text}")
+            self.console.print(f"Default font path: {default_path_info}\n")
+            
+            self.console.print("[cyan]Select installation method:[/cyan]")
+            self.console.print("[1] Download from GitHub")
+            self.console.print("[2] Use local font package (manual input)")
+            self.console.print("[3] Browse default font path")
+            self.console.print("[4] Set default font path")
+            self.console.print("[5] Return to menu\n")
+        
+        choice = Prompt.ask("选择" if is_chinese() else "Select", choices=["1", "2", "3", "4", "5"])
         
         if choice == "1":
             self._install_fonts_from_github()
         elif choice == "2":
             self._install_fonts_from_local()
+        elif choice == "3":
+            self._install_fonts_from_default_path()
+        elif choice == "4":
+            self._set_default_font_path()
     
     def _install_fonts_from_github(self):
         """Download and install fonts from GitHub"""
@@ -328,6 +338,128 @@ class TUIApplication:
             setup_fonts,
             zip_path
         )
+        
+        Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+    
+    def _set_default_font_path(self):
+        """Set default font zip package search path"""
+        self.clear_screen()
+        self.print_header()
+        
+        current_path = Config.get_default_font_path()
+        
+        if is_chinese():
+            self.console.print("\n[cyan]设置默认字体包路径[/cyan]\n")
+            if current_path:
+                self.console.print(f"当前路径: [yellow]{current_path}[/yellow]\n")
+            else:
+                self.console.print("当前路径: [yellow]未设置[/yellow]\n")
+            
+            new_path = Prompt.ask("请输入新的默认路径（留空取消）")
+        else:
+            self.console.print("\n[cyan]Set Default Font Package Path[/cyan]\n")
+            if current_path:
+                self.console.print(f"Current path: [yellow]{current_path}[/yellow]\n")
+            else:
+                self.console.print("Current path: [yellow]Not set[/yellow]\n")
+            
+            new_path = Prompt.ask("Enter new default path (leave empty to cancel)")
+        
+        if not new_path:
+            self.console.print("[yellow]Cancelled[/yellow]" if is_chinese() else "[yellow]Cancelled[/yellow]")
+            Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+            return
+        
+        # Validate path
+        if not os.path.isdir(new_path):
+            self.console.print(f"[red]X 路径不存在: {new_path}[/red]" if is_chinese() else f"[red]X Path does not exist: {new_path}[/red]")
+            Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+            return
+        
+        Config.set_default_font_path(new_path)
+        self.console.print("[green]✓ 默认路径已设置[/green]" if is_chinese() else "[green]✓ Default path set successfully[/green]")
+        Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+    
+    def _install_fonts_from_default_path(self):
+        """Install fonts from default path"""
+        self.clear_screen()
+        self.print_header()
+        
+        default_path = Config.get_default_font_path()
+        
+        if not default_path:
+            self.console.print("[yellow]Default font path not configured. Please set it first.[/yellow]" if not is_chinese() else "[yellow]默认字体路径未配置，请先设置。[/yellow]")
+            Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+            return
+        
+        if not os.path.isdir(default_path):
+            self.console.print(f"[red]X Default path does not exist: {default_path}[/red]" if not is_chinese() else f"[red]X 默认路径不存在: {default_path}[/red]")
+            Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+            return
+        
+        # List zip files in the directory
+        try:
+            zip_files = [f for f in os.listdir(default_path) if f.lower().endswith('.zip')]
+            
+            if not zip_files:
+                self.console.print("[yellow]No zip files found in default path[/yellow]" if not is_chinese() else "[yellow]默认路径中未找到 zip 文件[/yellow]")
+                Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+                return
+            
+            # Display available font packages
+            if is_chinese():
+                self.console.print(f"\n[cyan]在默认路径中找到 {len(zip_files)} 个字体包:[/cyan]\n")
+            else:
+                self.console.print(f"\n[cyan]Found {len(zip_files)} font packages in default path:[/cyan]\n")
+            
+            table = Table(show_header=True)
+            table.add_column("编号" if is_chinese() else "No.", style="cyan")
+            table.add_column("文件名" if is_chinese() else "File Name")
+            table.add_column("大小" if is_chinese() else "Size")
+            
+            for idx, zip_file in enumerate(zip_files, 1):
+                file_path = os.path.join(default_path, zip_file)
+                size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                table.add_row(str(idx), zip_file, f"{size_mb:.2f} MB")
+            
+            self.console.print(table)
+            self.console.print()
+            
+            # Let user select a package
+            choices = [str(i) for i in range(1, len(zip_files) + 1)] + ['0']
+            prompt = "选择字体包 (0=取消)" if is_chinese() else "Select font package (0=Cancel)"
+            choice = Prompt.ask(prompt, choices=choices)
+            
+            if choice == '0':
+                self.console.print("[yellow]Cancelled[/yellow]" if is_chinese() else "[yellow]Cancelled[/yellow]")
+                Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
+                return
+            
+            selected_file = zip_files[int(choice) - 1]
+            selected_path = os.path.join(default_path, selected_file)
+            
+            # Confirm with user
+            if is_chinese():
+                if not Confirm.ask(f"\n[yellow]确认安装 {selected_file}?[/yellow]"):
+                    self.console.print("[yellow]已取消[/yellow]")
+                    Prompt.ask("按回车返回", default="")
+                    return
+            else:
+                if not Confirm.ask(f"\n[yellow]Confirm install {selected_file}?[/yellow]"):
+                    self.console.print("[yellow]Cancelled[/yellow]")
+                    Prompt.ask("Press Enter to return", default="")
+                    return
+            
+            task_name = f"安装字体: {selected_file}" if is_chinese() else f"Installing font: {selected_file}"
+            self._run_task_with_progress(
+                task_name,
+                setup_fonts,
+                selected_path
+            )
+            
+        except Exception as e:
+            error = f"[red]X 错误: {str(e)}[/red]" if is_chinese() else f"[red]X Error: {str(e)}[/red]"
+            self.console.print(error + "\n")
         
         Prompt.ask("Press Enter" if is_chinese() else "Press Enter", default="")
     

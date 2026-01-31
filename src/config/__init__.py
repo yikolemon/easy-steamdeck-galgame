@@ -50,6 +50,7 @@ class Config:
     
     # Runtime configuration (set by user)
     _target_language: Optional[str] = None
+    _default_font_path: Optional[str] = None
     
     @classmethod
     def get_fonts_dir(cls) -> str:
@@ -88,6 +89,21 @@ class Config:
         """Set target language and save to config"""
         cls._target_language = lang
         cls.save_config({'target_language': lang})
+    
+    @classmethod
+    def get_default_font_path(cls) -> Optional[str]:
+        """Get default font zip package search path"""
+        if cls._default_font_path is None:
+            # Load from config file
+            config = cls.load_config()
+            cls._default_font_path = config.get('default_font_path')
+        return cls._default_font_path
+    
+    @classmethod
+    def set_default_font_path(cls, path: str):
+        """Set default font zip package search path and save to config"""
+        cls._default_font_path = path
+        cls.save_config({'default_font_path': path})
     
     @classmethod
     def load_config(cls) -> Dict[str, Any]:
