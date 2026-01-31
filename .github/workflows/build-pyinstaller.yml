@@ -1,0 +1,104 @@
+name: Build PyInstaller Executable for SteamDeck
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-pyinstaller:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            python3-dev \
+            libx11-dev \
+            libxext-dev
+            
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller \
+            --name steamdeck-galgame \
+            --onefile \
+            --console \
+            --add-data "data/icons:data/icons" \
+            --hidden-import=src \
+            --hidden-import=src.tui \
+            --hidden-import=src.ui \
+            --hidden-import=src.core \
+            --hidden-import=src.core.installers \
+            --hidden-import=src.utils \
+            --hidden-import=requests \
+            --strip \
+            run.py
+            
+      - name: Verify executable
+        run: |
+          ls -lh dist/steamdeck-galgame
+          file dist/steamdeck-galgame
+          
+      - name: Create Release Assets
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cd dist
+          tar -czf steamdeck-galgame-executable.tar.gz steamdeck-galgame
+          ls -lh steamdeck-galgame*
+          
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/steamdeck-galgame
+            dist/steamdeck-galgame-executable.tar.gz
+          body: |
+            ## PyInstaller Executable for SteamDeck
+            
+            This release includes a standalone executable that requires NO Python installation!
+            
+            ### Usage:
+            ```bash
+            # Download the executable
+            chmod +x steamdeck-galgame
+            
+            # Run directly on SteamDeck
+            ./steamdeck-galgame
+            ```
+            
+            ### Features:
+            - ✅ No Python required
+            - ✅ No pip required
+            - ✅ All dependencies bundled
+            - ✅ Ready to use on SteamDeck
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: pyinstaller-executable
+          path: dist/steamdeck-galgame*
+          retention-days: 30
