@@ -156,10 +156,12 @@ class GitHubReleaseManager:
                         if total_size > 0:
                             percent = (downloaded / total_size) * 100
                             progress_msg = f"  Progress: {percent:.1f}% ({downloaded / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB)"
-                            print(progress_msg, end='\r', flush=True)
+                            sys.stderr.write(progress_msg + '\r')
+                            sys.stderr.flush()
             
             # Clear progress line after download completes
-            print(" " * 80)  # Clear the line
+            sys.stderr.write(" " * 80 + '\n')
+            sys.stderr.flush()
             
             logger.info(f"Download complete: {dest_path}")
             return True, f"Download complete: {asset.name}"
