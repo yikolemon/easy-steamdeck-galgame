@@ -1,9 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for SteamDeck Galgame Chinese Configuration Tool
 # This creates a standalone executable with all dependencies bundled
+# 
+# Usage: 
+#   pyinstaller --clean steamdeck_galgame.spec
+#   BUILD_TYPE=debug pyinstaller --clean steamdeck_galgame.spec
+#   BUILD_TYPE=release pyinstaller --clean steamdeck_galgame.spec
 
 import sys
+import os
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
+# Determine build type from environment variable
+build_type = os.environ.get('BUILD_TYPE', 'release').lower()
+exe_name = 'steamdeck-galgame-debug' if build_type == 'debug' else 'steamdeck-galgame-release'
 
 block_cipher = None
 
@@ -43,7 +53,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='steamdeck-galgame',
+    name=exe_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -63,5 +73,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='steamdeck-galgame',
+    name=exe_name,
 )

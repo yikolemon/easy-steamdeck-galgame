@@ -7,11 +7,20 @@ import sys
 import logging
 import os  # 新增导入
 
+# 根据 BUILD_TYPE 环境变量设置日志级别
+# 支持: debug, release (默认)
+build_type = os.environ.get('BUILD_TYPE', 'release').lower()
+log_level = logging.DEBUG if build_type == 'debug' else logging.INFO
+
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+# 记录构建类型
+logger = logging.getLogger(__name__)
+logger.debug(f"Application running in {build_type.upper()} mode")
 
 def ensure_root():
     """检测权限，如果不是 root 则尝试通过 sudo 重启"""
