@@ -1,0 +1,35 @@
+{
+  "app-id": "io.github.steamdeck_galgame",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "23.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "steamdeck-galgame",
+  "finish-args": [
+    "--share=network",
+    "--socket=x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--filesystem=host:ro",
+    "--filesystem=home:rw"
+  ],
+  "modules": [
+    {
+      "name": "steamdeck-galgame",
+      "buildsystem": "simple",
+      "build-commands": [
+        "mkdir -p ${FLATPAK_DEST}/app",
+        "cp main.py utils.py locale_installer.py font_installer.py game_launcher.py ${FLATPAK_DEST}/app/",
+        "mkdir -p ${FLATPAK_DEST}/bin",
+        "cat > ${FLATPAK_DEST}/bin/steamdeck-galgame << 'EOF'\n#!/bin/bash\ncd /app/app\npython3 main.py \"$@\"\nEOF",
+        "chmod +x ${FLATPAK_DEST}/bin/steamdeck-galgame"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "."
+        }
+      ]
+    }
+  ],
+  "desktop-file-name-prefix": "(Flatpak) "
+}
