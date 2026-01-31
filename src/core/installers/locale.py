@@ -1,43 +1,44 @@
 """
-Locale 安装器
+Chinese Locale installer
 """
 
 import subprocess
 from typing import Tuple
-from src.utils import run_command, disable_readonly, enable_readonly, is_zh_locale_enabled
+from src.utils import run_command, disable_readonly_if_needed, enable_readonly, is_zh_locale_enabled
 from .base import BaseInstaller
 
 
 class LocaleInstaller(BaseInstaller):
-    """中文 locale 安装器"""
+    """Chinese locale installer"""
     
     def install(self) -> Tuple[bool, str]:
         """
-        安装中文 locale
+        Install Chinese locale
         
         Returns:
-            (成功标志, 详细信息)
+            (success_flag, detailed_message)
         """
         try:
-            # 1. 关闭只读模式
-            print("👉 1. 关闭 SteamOS 只读模式...")
-            if not disable_readonly():
-                return False, "❌ 无法关闭只读模式，请检查权限"
+            # 1. Check if system needs readonly disable
+            print("[1/5] Checking if readonly mode needs to be disabled...")
+            target_path = "/etc/locale.gen"
+            if not disable_readonly_if_needed(target_path):
+                return False, "ERROR: Failed to disable readonly mode, please check permissions"
             
-            # 2. 初始化 pacman key
-            print("👉 2. 初始化 pacman key...")
+            # 2. Initialize pacman keys
+            print("[2/5] Initializing pacman keys...")
             success, msg = run_command("pacman-key --init", use_sudo=True)
             if not success:
                 enable_readonly()
-                return False, f"❌ pacman-key --init 失败: {msg}"
+                return False, f"ERROR: pacman-key --init failed: {msg}"
             
             success, msg = run_command("pacman-key --populate archlinux", use_sudo=True)
             if not success:
                 enable_readonly()
-                return False, f"❌ pacman-key --populate 失败: {msg}"
+                return False, f"ERROR: pacman-key --populate failed: {msg}"
             
-            # 3. 检查并启用 zh_CN.UTF-8 locale
-            print("👉 3. 启用简体中文 locale（zh_CN.UTF-8）...")
+            # 3. Check and enable zh_CN.UTF-8 locale
+            print("[3/5] Enabling Chinese locale (zh_CN.UTF-8)...")
             check_result = subprocess.run(
                 "grep '^#zh_CN.UTF-8 UTF-8' /etc/locale.gen",
                 shell=True,
@@ -46,50 +47,50 @@ class LocaleInstaller(BaseInstaller):
             )
             
             if check_result.returncode == 0:
-                # 找到被注释的行，需要取消注释
+                # Found commented line, need to uncomment it
                 success, msg = run_command(
                     "sed -i 's/^#zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen",
                     use_sudo=True
                 )
                 if not success:
                     enable_readonly()
-                    return False, f"❌ 修改 locale.gen 失败: {msg}"
+                    return False, f"ERROR: Failed to modify locale.gen: {msg}"
             else:
-                print("⚠️ zh_CN.UTF-8 已启用或不存在，跳过修改")
+                print("[WARN] zh_CN.UTF-8 already enabled or not found, skipping modification")
             
-            # 4. 生成 locale
-            print("👉 4. 生成 locale...")
+            # 4. Generate locale
+            print("[4/5] Generating locale...")
             success, msg = run_command("locale-gen", use_sudo=True)
             if not success:
                 enable_readonly()
-                return False, f"❌ locale-gen 失败: {msg}"
+                return False, f"ERROR: locale-gen failed: {msg}"
             
-            # 5. 启用只读模式
-            print("👉 5. 恢复 SteamOS 只读模式...")
+            # 5. Re-enable readonly mode
+            print("[5/5] Re-enabling SteamOS readonly mode...")
             if not enable_readonly():
-                return False, "⚠️ 警告: 无法恢复只读模式，请手动执行 'sudo steamos-readonly enable'"
+                return False, "WARNING: Failed to re-enable readonly mode, please manually run 'sudo steamos-readonly enable'"
             
-            return True, "✅ 中文 locale 安装完成！"
+            return True, "SUCCESS: Chinese locale installation completed!"
         
         except Exception as e:
             try:
                 enable_readonly()
             except:
                 pass
-            return False, f"❌ 异常: {str(e)}"
+            return False, f"ERROR: Exception occurred: {str(e)}"
     
     def check_status(self) -> bool:
-        """检查中文 locale 是否已安装"""
+        """Check if Chinese locale is installed"""
         return is_zh_locale_enabled()
 
 
 def setup_locale() -> Tuple[bool, str]:
-    """安装中文 locale 的便捷函数"""
+    """Convenience function to install Chinese locale"""
     installer = LocaleInstaller()
     return installer.install()
 
 
 def check_locale_status() -> bool:
-    """检查中文 locale 状态的便捷函数"""
+    """Convenience function to check Chinese locale status"""
     installer = LocaleInstaller()
     return installer.check_status()

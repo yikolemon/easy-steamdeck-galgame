@@ -1,5 +1,5 @@
 """
-核心模块
+Core module
 """
 
 from .game_launcher import (

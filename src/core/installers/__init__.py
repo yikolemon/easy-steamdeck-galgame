@@ -1,5 +1,5 @@
 """
-安装器模块
+Installers module
 """
 
 from .locale import (

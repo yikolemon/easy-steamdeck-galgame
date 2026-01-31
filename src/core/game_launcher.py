@@ -1,5 +1,5 @@
 """
-游戏启动器模块
+Game launcher module
 """
 
 import os
@@ -11,85 +11,85 @@ from src.config import Config
 
 
 class GameLauncher:
-    """游戏启动选项配置类"""
+    """Game launch options configuration class"""
     
     def __init__(self):
         self.steam_user_dir = Config.get_steam_dir()
     
     def find_steam_apps(self) -> List[Dict]:
         """
-        查找已安装的 Steam 游戏
+        Find installed Steam games
         
         Returns:
-            游戏列表 [{"app_id": xxx, "name": xxx}, ...]
+            List of games [{"app_id": xxx, "name": xxx}, ...]
         """
         games = []
         
         try:
-            # 遍历 userdata 目录
+            # Traverse userdata directory
             if not os.path.isdir(self.steam_user_dir):
                 return games
             
-            # 查找所有用户目录
+            # Find all user directories
             for user_id in os.listdir(self.steam_user_dir):
                 user_path = os.path.join(self.steam_user_dir, user_id)
                 config_file = os.path.join(user_path, "config/shortcuts.vdf")
                 
-                # 检查 shortcuts.vdf 文件
+                # Check shortcuts.vdf file
                 if os.path.isfile(config_file):
-                    # 这里需要解析 VDF 文件
-                    # 为了简化，可以通过命令行查询
+                    # Parse VDF file here
+                    # For now, query via command line
                     pass
         
         except Exception as e:
-            print(f"查找游戏异常: {str(e)}")
+            print(f"Error finding games: {str(e)}")
         
         return games
     
     def get_zh_locale_command(self) -> str:
-        """获取中文 locale 启动命令"""
+        """Get Chinese locale launch command"""
         return "LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 LC_CTYPE=zh_CN.UTF-8 LC_MESSAGES=zh_CN.UTF-8 LANGUAGE=zh_CN %command%"
     
     def apply_zh_locale_to_game(self, game_id: str, game_path: str) -> Tuple[bool, str]:
         """
-        为游戏应用中文 locale 设置
+        Apply Chinese locale settings to game
         
         Args:
-            game_id: 游戏 ID 或名称
-            game_path: 游戏路径
+            game_id: Game ID or name
+            game_path: Game path
             
         Returns:
-            (成功标志, 详细信息)
+            (success_flag, detailed_message)
         """
         try:
             zh_command = self.get_zh_locale_command()
             
-            # 根据实际的游戏启动器进行配置
-            # 这里提供命令供用户手动配置
+            # Configure based on actual game launcher
+            # Provide command for manual user configuration
             
             info = f"""
-🎮 中文启动选项配置
+Game Launch Options Configuration
 
-游戏: {game_id}
-路径: {game_path}
+Game: {game_id}
+Path: {game_path}
 
-请在游戏属性 → 启动选项中填入以下内容:
+Enter the following in Game Properties -> Launch Options:
 
 {zh_command}
 
-这样在启动游戏时就会使用中文 locale。
+This will use Chinese locale when launching the game.
 """
             return True, info
         
         except Exception as e:
-            return False, f"❌ 异常: {str(e)}"
+            return False, f"ERROR: Exception: {str(e)}"
     
     def copy_zh_command_to_clipboard(self) -> bool:
-        """复制中文 locale 命令到剪贴板"""
+        """Copy Chinese locale command to clipboard"""
         try:
             command = self.get_zh_locale_command()
             
-            # 尝试使用不同的剪贴板工具
+            # Try different clipboard tools
             try:
                 process = subprocess.Popen(['xclip', '-selection', 'clipboard'], 
                                          stdin=subprocess.PIPE)
@@ -105,23 +105,23 @@ class GameLauncher:
                     return False
         
         except Exception as e:
-            print(f"复制到剪贴板失败: {str(e)}")
+            print(f"Failed to copy to clipboard: {str(e)}")
             return False
 
 
 def get_zh_locale_preset() -> str:
-    """获取中文 locale 预设命令"""
+    """Get Chinese locale preset command"""
     launcher = GameLauncher()
     return launcher.get_zh_locale_command()
 
 
 def apply_zh_locale_to_game(game_id: str, game_path: str) -> Tuple[bool, str]:
-    """为游戏应用中文 locale 设置的便捷函数"""
+    """Convenience function to apply Chinese locale settings to game"""
     launcher = GameLauncher()
     return launcher.apply_zh_locale_to_game(game_id, game_path)
 
 
 def copy_zh_command_to_clipboard() -> bool:
-    """复制中文 locale 命令到剪贴板的便捷函数"""
+    """Convenience function to copy Chinese locale command to clipboard"""
     launcher = GameLauncher()
     return launcher.copy_zh_command_to_clipboard()

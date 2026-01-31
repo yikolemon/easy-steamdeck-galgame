@@ -1,5 +1,5 @@
 """
-TUI模块 - 终端用户界面
+TUI Module - Terminal User Interface
 """
 
 from .main import TUIApplication

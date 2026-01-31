@@ -1,19 +1,19 @@
 """
-字体安装器
+Chinese Fonts installer
 """
 
 import os
 import zipfile
 import shutil
 from typing import Tuple, Optional, Callable, Dict
-from src.utils import run_command, disable_readonly, enable_readonly, is_fonts_installed
+from src.utils import run_command, disable_readonly_if_needed, enable_readonly, is_fonts_installed
 from src.config import Config
 from .base import BaseInstaller
 from src.core.font_downloader import FontReleaseDownloader, GitHubAsset
 
 
 class FontInstaller(BaseInstaller):
-    """中文字体安装器"""
+    """Chinese fonts installer"""
     
     def __init__(self, zip_path: Optional[str] = None, asset: Optional[GitHubAsset] = None):
         self.zip_path: Optional[str] = zip_path
@@ -27,35 +27,35 @@ class FontInstaller(BaseInstaller):
             self.zip_path = zip_path
         
         if not self.zip_path:
-            return False, "❌ 未指定字体包路径"
+            return False, "ERROR: Font package path not specified"
         
         try:
-            # 检查 zip 文件是否存在
+            # Check if zip file exists
             if not os.path.isfile(self.zip_path):
-                return False, f"❌ 字体包不存在: {self.zip_path}"
+                return False, f"ERROR: Font package not found: {self.zip_path}"
             
-            # 关闭只读模式
-            print("👉 1. 关闭 SteamOS 只读模式...")
-            if not disable_readonly():
-                return False, "❌ 无法关闭只读模式，请检查权限"
+            # Check if readonly mode needs to be disabled
+            print("[1/6] Checking if readonly mode needs to be disabled...")
+            if not disable_readonly_if_needed(self.fonts_dir):
+                return False, "ERROR: Failed to disable readonly mode, please check permissions"
             
             try:
-                # 创建临时解压目录
+                # Create temporary extraction directory
                 if os.path.exists(self.temp_dir):
                     shutil.rmtree(self.temp_dir)
                 os.makedirs(self.temp_dir, exist_ok=True)
                 
-                # 解压字体包
-                print("👉 2. 解压字体包...")
+                # Extract font package
+                print("[2/6] Extracting font package...")
                 with zipfile.ZipFile(self.zip_path, 'r') as zip_ref:
                     zip_ref.extractall(self.temp_dir)
                 
-                # 创建目标目录
-                print("👉 3. 创建字体目录...")
+                # Create target directory
+                print("[3/6] Creating fonts directory...")
                 os.makedirs(self.fonts_dir, exist_ok=True)
                 
-                # 复制字体文件，跳过已存在的
-                print("👉 4. 复制字体文件...")
+                # Copy font files, skip existing ones
+                print("[4/6] Copying font files...")
                 font_count = 0
                 skip_count = 0
                 
@@ -65,90 +65,90 @@ class FontInstaller(BaseInstaller):
                         dst_file = os.path.join(self.fonts_dir, file)
                         
                         if os.path.exists(dst_file):
-                            print(f"⏭️ 跳过已存在: {file}")
+                            print(f"[SKIP] File already exists: {file}")
                             skip_count += 1
                         else:
                             shutil.copy2(src_file, dst_file)
-                            print(f"✓ 已复制: {file}")
+                            print(f"[OK] Copied: {file}")
                             font_count += 1
                 
-                # 更新字体缓存
-                print("👉 5. 更新字体缓存...")
+                # Update font cache
+                print("[5/6] Updating font cache...")
                 success, msg = run_command("fc-cache -fv", use_sudo=True)
                 if not success:
-                    # 字体缓存失败不影响最终结果
-                    print(f"⚠️ 字体缓存更新可能失败: {msg}")
+                    # Font cache update failure does not affect final result
+                    print(f"[WARN] Font cache update may have failed: {msg}")
                 
-                # 清理临时目录
+                # Clean temporary directory
                 shutil.rmtree(self.temp_dir)
                 
-                # 恢复只读模式
-                print("👉 6. 恢复 SteamOS 只读模式...")
+                # Re-enable readonly mode
+                print("[6/6] Re-enabling SteamOS readonly mode...")
                 if not enable_readonly():
-                    return False, f"⚠️ 警告: 无法恢复只读模式，请手动执行 'sudo steamos-readonly enable'\n✅ 但字体已安装成功！复制了 {font_count} 个文件，跳过了 {skip_count} 个已存在的文件"
+                    return False, f"WARNING: Failed to re-enable readonly mode, please manually run 'sudo steamos-readonly enable'\nBUT: Fonts installed successfully! Copied {font_count} files, skipped {skip_count} existing files"
                 
-                return True, f"✅ 字体安装完成！\n复制了 {font_count} 个文件\n跳过了 {skip_count} 个已存在的文件"
+                return True, f"SUCCESS: Font installation completed!\nCopied {font_count} files\nSkipped {skip_count} existing files"
             
             except Exception as e:
                 enable_readonly()
-                return False, f"❌ 安装过程异常: {str(e)}"
+                return False, f"ERROR: Installation failed: {str(e)}"
         
         except Exception as e:
             try:
                 enable_readonly()
             except:
                 pass
-            return False, f"❌ 异常: {str(e)}"
+            return False, f"ERROR: Exception occurred: {str(e)}"
     
     def check_status(self) -> bool:
-        """检查字体是否已安装"""
+        """Check if fonts are installed"""
         return is_fonts_installed()
     
     def get_fonts_count(self) -> int:
-        """获取已安装的字体数量"""
+        """Get count of installed fonts"""
         if os.path.isdir(self.fonts_dir):
             return len(os.listdir(self.fonts_dir))
         return 0
 
 
 def setup_fonts(zip_path: str) -> Tuple[bool, str]:
-    """安装中文字体的便捷函数"""
+    """Convenience function to install Chinese fonts"""
     installer = FontInstaller(zip_path)
     return installer.install()
 
 
 def download_and_install_fonts(asset: GitHubAsset, progress_callback: Optional[Callable] = None) -> Tuple[bool, str]:
     """
-    从 GitHub Release 下载并安装字体的便捷函数
+    Download and install fonts from GitHub Release
     
     Args:
-        asset: 要下载的字体资源
-        progress_callback: 进度回调
+        asset: The font resource to download
+        progress_callback: Progress callback function
         
     Returns:
-        (成功标志, 详细信息)
+        (success_flag, detailed_message)
     """
     downloader = FontReleaseDownloader()
     
-    # 下载字体
-    print(f"👉 正在下载字体包: {asset.name}...")
+    # Download fonts
+    print(f"[1/2] Downloading font package: {asset.name}...")
     success, msg, zip_path = downloader.download_font(asset, progress_callback)
     
     if not success:
         return False, msg
     
-    # 安装字体
-    print("\n👉 开始安装字体...")
+    # Install fonts
+    print("\n[2/2] Starting font installation...")
     installer = FontInstaller(zip_path)
     return installer.install(progress_callback=progress_callback)
 
 
 def list_available_fonts() -> Tuple[bool, list]:
     """
-    列出可用的字体包
+    List available font packages
     
     Returns:
-        (成功标志, 资源列表)
+        (success_flag, resources_list)
     """
     try:
         downloader = FontReleaseDownloader()
@@ -158,27 +158,27 @@ def list_available_fonts() -> Tuple[bool, list]:
         else:
             return False, []
     except Exception as e:
-        print(f"❌ 获取字体列表失败: {e}")
+        print(f"ERROR: Failed to get font list: {e}")
         return False, []
 
 
 def get_fonts_release_info() -> Dict:
-    """获取字体 Release 信息"""
+    """Get font Release information"""
     try:
         downloader = FontReleaseDownloader()
         return downloader.get_release_info()
     except Exception as e:
-        print(f"❌ 获取 Release 信息失败: {e}")
+        print(f"ERROR: Failed to get Release info: {e}")
         return {}
 
 
 def check_fonts_status() -> bool:
-    """检查字体状态的便捷函数"""
+    """Convenience function to check font status"""
     installer = FontInstaller()
     return installer.check_status()
 
 
 def get_fonts_count() -> int:
-    """获取已安装字体数量的便捷函数"""
+    """Convenience function to get installed fonts count"""
     installer = FontInstaller()
     return installer.get_fonts_count()

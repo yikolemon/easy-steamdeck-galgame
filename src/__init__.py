@@ -1,5 +1,5 @@
 """
-SteamDeck 中文环境配置工具 - 主包
+SteamDeck Chinese Environment Config Tool - Main Package
 """
 
 __version__ = "1.0.0"
