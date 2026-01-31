@@ -49,6 +49,7 @@ jobs:
             --hidden-import=src.core.installers \
             --hidden-import=src.utils \
             --hidden-import=requests \
+            --hidden-import=rich \
             --strip \
             run.py
             
