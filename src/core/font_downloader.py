@@ -5,6 +5,7 @@ GitHub Release download manager
 import requests
 import os
 import json
+import sys
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import logging
@@ -151,10 +152,14 @@ class GitHubReleaseManager:
                         if progress_callback:
                             progress_callback(downloaded, total_size)
                         
-                        # Print progress
+                        # Print progress with real-time display
                         if total_size > 0:
                             percent = (downloaded / total_size) * 100
-                            print(f"  Progress: {percent:.1f}% ({downloaded / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB)")
+                            progress_msg = f"  Progress: {percent:.1f}% ({downloaded / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB)"
+                            print(progress_msg, end='\r', flush=True)
+            
+            # Clear progress line after download completes
+            print(" " * 80)  # Clear the line
             
             logger.info(f"Download complete: {dest_path}")
             return True, f"Download complete: {asset.name}"
