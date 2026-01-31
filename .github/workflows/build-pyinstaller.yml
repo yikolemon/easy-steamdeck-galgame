@@ -87,17 +87,17 @@ jobs:
             ```
             
             ### Features:
-            - ✅ No Python required
-            - ✅ No pip required
-            - ✅ All dependencies bundled
-            - ✅ Ready to use on SteamDeck
+            - [x] No Python required
+            - [x] No pip required
+            - [x] All dependencies bundled
+            - [x] Ready to use on SteamDeck
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pyinstaller-executable
           path: dist/steamdeck-galgame*
