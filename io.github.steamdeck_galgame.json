@@ -18,9 +18,10 @@
       "buildsystem": "simple",
       "build-commands": [
         "mkdir -p ${FLATPAK_DEST}/app",
-        "cp main.py utils.py locale_installer.py font_installer.py game_launcher.py ${FLATPAK_DEST}/app/",
+        "cp run.py ${FLATPAK_DEST}/app/",
+        "cp -r src ${FLATPAK_DEST}/app/",
         "mkdir -p ${FLATPAK_DEST}/bin",
-        "cat > ${FLATPAK_DEST}/bin/steamdeck-galgame << 'EOF'\n#!/bin/bash\ncd /app/app\npython3 main.py \"$@\"\nEOF",
+        "cat > ${FLATPAK_DEST}/bin/steamdeck-galgame << 'EOF'\n#!/bin/bash\ncd /app/app\npython3 run.py \"$@\"\nEOF",
         "chmod +x ${FLATPAK_DEST}/bin/steamdeck-galgame"
       ],
       "sources": [

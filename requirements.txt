@@ -1,0 +1,11 @@
+# 基础依赖
+requests>=2.25.0  # 用于 GitHub API 和文件下载
+
+# Python 3.7+ 内置支持 tkinter
+
+# 开发依赖（可选）
+# pytest>=6.0
+# pytest-cov>=2.10
+# black>=21.0
+# isort>=5.0
+# mypy>=0.9

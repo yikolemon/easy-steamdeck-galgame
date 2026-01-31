@@ -6,3 +6,16 @@ dist/
 build/
 .DS_Store
 *.log
+.idea/
+.venv/
+venv/
+env/
+.pytest_cache/
+*.egg/
+*.whl
+.coverage
+htmlcov/
+tmp/
+temp/
+.env
+.env.local

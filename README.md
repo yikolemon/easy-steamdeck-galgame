@@ -19,7 +19,7 @@ flatpak run io.github.steamdeck_galgame
 ### 或从源代码运行
 
 ```bash
-python3 main.py
+python3 run.py
 ```
 
 ## 功能
@@ -66,10 +66,29 @@ python3 main.py
 3. 粘贴到启动选项
 4. 保存
 
+## 项目结构
+
+该项目已进行完整的模块化重构，具有清晰的分层架构。详见：
+
+- 📄 [STRUCTURE.md](./STRUCTURE.md) - 详细项目结构说明
+- 📄 [OPTIMIZATION_REPORT.md](./OPTIMIZATION_REPORT.md) - 优化改进详细分析
+
+### 快速命令
+
+```bash
+python3 run.py          # 运行应用
+make run                # 使用 Makefile 运行
+make test               # 运行测试
+make lint               # 代码检查
+make format             # 代码格式化
+make clean              # 清理临时文件
+```
+
 ## 许可证
 
 MIT License
 
 ## 版本
 
-v1.0.0
+v1.0.0 - 完整模块化重构版本
+
