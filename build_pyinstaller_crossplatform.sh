@@ -213,7 +213,7 @@ pyinstaller \
     --hidden-import=src.core.installers \
     --hidden-import=src.utils \
     --hidden-import=requests \
-    --hidden-import=rich \
+    --collect-all=rich \
     --strip \
     --clean \
     run.py
