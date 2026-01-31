@@ -1,21 +1,50 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+*.egg/
+*.whl
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution
 dist/
 build/
-.DS_Store
-*.log
-.idea/
+
+# Virtual environments
 .venv/
 venv/
 env/
-.pytest_cache/
-*.egg/
-*.whl
-.coverage
-htmlcov/
-tmp/
-temp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
 .env
 .env.local
+
+# Application
+tmp/
+temp/
+/tmp/
+/temp/
+*.tmp
+
+# Downloads (runtime)
+/tmp/steamdeck_fonts/
+
+# Data directories (no assets)
+data/
+

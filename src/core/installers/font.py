@@ -9,7 +9,7 @@ from typing import Tuple, Optional, Callable, Dict
 from src.utils import run_command, disable_readonly_if_needed, enable_readonly, is_fonts_installed
 from src.config import Config
 from .base import BaseInstaller
-from src.core.font_downloader import FontReleaseDownloader, GitHubAsset
+from src.core.downloader import FontReleaseDownloader, GitHubAsset
 
 
 class FontInstaller(BaseInstaller):
