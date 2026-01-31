@@ -80,21 +80,7 @@ build_variant() {
     echo "🔨 开始打包 $variant 版本..."
     
     export BUILD_TYPE=$variant
-    pyinstaller \
-        --clean \
-        --name steamdeck-galgame-$variant \
-        --onefile \
-        --console \
-        --hidden-import=src \
-        --hidden-import=src.tui \
-        --hidden-import=src.core \
-        --hidden-import=src.core.downloader \
-        --hidden-import=src.core.installers \
-        --hidden-import=src.utils \
-        --hidden-import=requests \
-        --collect-all=rich \
-        --strip \
-        steamdeck_galgame.spec
+    pyinstaller --clean steamdeck_galgame.spec
     
     echo "✅ $variant 版本打包完成"
     

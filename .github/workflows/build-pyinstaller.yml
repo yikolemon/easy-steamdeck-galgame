@@ -43,39 +43,36 @@ jobs:
         env:
           BUILD_TYPE: ${{ matrix.build-type }}
         run: |
-          pyinstaller \
-            --clean \
-            --name steamdeck-galgame-${{ matrix.build-type }} \
-            --onefile \
-            --console \
-            --hidden-import=src \
-            --hidden-import=src.tui \
-            --hidden-import=src.core \
-            --hidden-import=src.core.downloader \
-            --hidden-import=src.core.installers \
-            --hidden-import=src.utils \
-            --hidden-import=requests \
-            --collect-all=rich \
-            --strip \
-            steamdeck_galgame.spec
+          pyinstaller --clean steamdeck_galgame.spec
             
       - name: Verify executable (${{ matrix.build-type }})
         run: |
-          ls -lh dist/steamdeck-galgame-${{ matrix.build-type }}
-          file dist/steamdeck-galgame-${{ matrix.build-type }}
+          # Output structure: dist/steamdeck-galgame-{type}/steamdeck-galgame-{type}
+          EXECUTABLE="dist/steamdeck-galgame-${{ matrix.build-type }}/steamdeck-galgame-${{ matrix.build-type }}"
+          if [ -f "$EXECUTABLE" ]; then
+            ls -lh "$EXECUTABLE"
+            file "$EXECUTABLE"
+          else
+            echo "❌ Executable not found at: $EXECUTABLE"
+            ls -lh dist/
+            exit 1
+          fi
           
       - name: Create tarball (${{ matrix.build-type }})
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          tar -czf steamdeck-galgame-${{ matrix.build-type }}.tar.gz steamdeck-galgame-${{ matrix.build-type }}
+          EXECUTABLE="steamdeck-galgame-${{ matrix.build-type }}/steamdeck-galgame-${{ matrix.build-type }}"
+          tar -czf steamdeck-galgame-${{ matrix.build-type }}.tar.gz "$EXECUTABLE"
           ls -lh steamdeck-galgame-${{ matrix.build-type }}*
           
       - name: Upload artifacts (${{ matrix.build-type }})
         uses: actions/upload-artifact@v4
         with:
           name: pyinstaller-${{ matrix.build-type }}
-          path: dist/steamdeck-galgame-${{ matrix.build-type }}*
+          path: |
+            dist/steamdeck-galgame-${{ matrix.build-type }}/steamdeck-galgame-${{ matrix.build-type }}
+            dist/steamdeck-galgame-${{ matrix.build-type }}.tar.gz
           retention-days: 30
   
   create-release:
