@@ -68,7 +68,7 @@ class LocaleInstaller(BaseInstaller):
             # 5. Re-enable readonly mode
             print("[5/5] Re-enabling SteamOS readonly mode...")
             if not enable_readonly():
-                return False, "WARNING: Failed to re-enable readonly mode, please manually run 'sudo steamos-readonly enable'"
+                return True, "WARNING: Failed to re-enable readonly mode, please manually run 'sudo steamos-readonly enable'"
             
             return True, "SUCCESS: Chinese locale installation completed!"
         

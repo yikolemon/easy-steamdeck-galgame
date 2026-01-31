@@ -29,18 +29,46 @@ def is_steamos_system() -> bool:
         return False
 
 
-def is_directory_writable(path: str) -> bool:
+def is_path_writable(path: str) -> bool:
     """
-    Check if a directory is writable without needing readonly disable.
-    If the directory doesn't exist, check the first existing parent directory.
+    Check if a path (file or directory) is writable without needing readonly disable.
+    
+    For existing items:
+    - If it's a directory: check the directory's writeability
+    - If it's a file: check if we can write to it
+    
+    For non-existing items:
+    - Check the first existing parent directory's writeability (since that's where it will be created)
+    
     Returns True if writable, False if read-only.
     """
     check_path = path
+    is_file_check = False
     
-    # If path doesn't exist, find the first existing parent directory
-    if not os.path.exists(check_path):
-        logger.debug(f"Path does not exist: {check_path}, checking parent directories...")
-        check_path = os.path.dirname(check_path)
+    if os.path.exists(path):
+        # Path exists
+        if os.path.isfile(path):
+            # For files, we need to check if the file itself is writable
+            is_file_check = True
+            try:
+                # Try to open the file in append mode (non-destructive test)
+                with open(path, 'a'):
+                    pass
+                return True
+            except (OSError, IOError) as e:
+                logger.debug(f"File is not writable: {path} - {str(e)}")
+                return False
+        elif os.path.isdir(path):
+            # For directories, check the directory's writeability
+            check_path = path
+        else:
+            # Other types (symlinks, devices, etc.)
+            logger.warning(f"Path is not a file or directory: {path}")
+            return False
+    else:
+        # Path doesn't exist - check the first existing parent directory
+        logger.debug(f"Path does not exist: {path}, checking parent directories...")
+        check_path = os.path.dirname(path)
         
         # Keep going up until we find an existing directory or reach root
         while check_path and not os.path.exists(check_path):
@@ -53,14 +81,25 @@ def is_directory_writable(path: str) -> bool:
         
         logger.debug(f"Checking parent directory instead: {check_path}")
     
+    # Check if the directory is writable by trying to create a temporary file
     try:
-        # Try to create a temporary file in the directory
         import tempfile
         with tempfile.NamedTemporaryFile(dir=check_path, delete=True):
             return True
     except (OSError, IOError) as e:
         logger.debug(f"Directory is not writable: {check_path} - {str(e)}")
         return False
+
+
+def is_directory_writable(path: str) -> bool:
+    """
+    Check if a directory is writable without needing readonly disable.
+    If the directory doesn't exist, check the first existing parent directory.
+    Returns True if writable, False if read-only.
+    
+    NOTE: This function is for directories only. For files or mixed paths, use is_path_writable().
+    """
+    return is_path_writable(path)
 
 
 def disable_readonly_if_needed(target_path: str) -> bool:
@@ -91,7 +130,7 @@ def disable_readonly_if_needed(target_path: str) -> bool:
             f"This is likely Arch Linux or non-SteamOS system. "
             f"Try running with sudo: sudo {target_path}"
         )
-        return False
+        return True
     
     # Step 3: Try to disable readonly on SteamOS
     logger.info(f"SteamOS detected. Attempting to disable readonly mode for: {target_path}")
@@ -130,7 +169,7 @@ def enable_readonly() -> bool:
     """
     if not is_steamos_system():
         logger.warning("steamos-readonly command not available (not a SteamOS system)")
-        return False
+        return True
     
     success, msg = run_command("steamos-readonly enable", use_sudo=True)
     return success
