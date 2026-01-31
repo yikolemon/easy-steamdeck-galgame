@@ -11,6 +11,9 @@ on:
 jobs:
   build-pyinstaller:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [debug, release]
     
     steps:
       - name: Checkout code
@@ -36,53 +39,100 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
           
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (${{ matrix.build-type }})
+        env:
+          BUILD_TYPE: ${{ matrix.build-type }}
         run: |
           pyinstaller \
-            --name steamdeck-galgame \
+            --clean \
+            --name steamdeck-galgame-${{ matrix.build-type }} \
             --onefile \
             --console \
             --hidden-import=src \
             --hidden-import=src.tui \
             --hidden-import=src.core \
+            --hidden-import=src.core.downloader \
             --hidden-import=src.core.installers \
             --hidden-import=src.utils \
             --hidden-import=requests \
             --collect-all=rich \
             --strip \
-            run.py
+            steamdeck_galgame.spec
             
-      - name: Verify executable
+      - name: Verify executable (${{ matrix.build-type }})
         run: |
-          ls -lh dist/steamdeck-galgame
-          file dist/steamdeck-galgame
+          ls -lh dist/steamdeck-galgame-${{ matrix.build-type }}
+          file dist/steamdeck-galgame-${{ matrix.build-type }}
           
-      - name: Create Release Assets
+      - name: Create tarball (${{ matrix.build-type }})
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          tar -czf steamdeck-galgame-executable.tar.gz steamdeck-galgame
-          ls -lh steamdeck-galgame*
+          tar -czf steamdeck-galgame-${{ matrix.build-type }}.tar.gz steamdeck-galgame-${{ matrix.build-type }}
+          ls -lh steamdeck-galgame-${{ matrix.build-type }}*
+          
+      - name: Upload artifacts (${{ matrix.build-type }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyinstaller-${{ matrix.build-type }}
+          path: dist/steamdeck-galgame-${{ matrix.build-type }}*
+          retention-days: 30
+  
+  create-release:
+    needs: build-pyinstaller
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          # Copy debug build
+          cp all-artifacts/pyinstaller-debug/* release-assets/ || true
+          # Copy release build  
+          cp all-artifacts/pyinstaller-release/* release-assets/ || true
+          ls -lh release-assets/
           
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/steamdeck-galgame
-            dist/steamdeck-galgame-executable.tar.gz
+            release-assets/steamdeck-galgame-debug
+            release-assets/steamdeck-galgame-release
+            release-assets/steamdeck-galgame-debug.tar.gz
+            release-assets/steamdeck-galgame-release.tar.gz
           body: |
-            ## PyInstaller Executable for SteamDeck
+            ## PyInstaller Executables for SteamDeck
             
-            This release includes a standalone executable that requires NO Python installation!
+            This release includes standalone executables that require NO Python installation!
+            
+            ### 🟢 Release Version (steamdeck-galgame-release)
+            - Production-ready executable
+            - Minimal logging (INFO level)
+            - Optimized for performance
+            - Recommended for daily use
+            
+            ### 🔵 Debug Version (steamdeck-galgame-debug)
+            - Development/troubleshooting build
+            - All debug logs enabled
+            - Shows detailed execution information
+            - Use when reporting issues or debugging
             
             ### Usage:
             ```bash
-            # Download the executable
-            chmod +x steamdeck-galgame
+            # Download either version
+            # Release (recommended):
+            chmod +x steamdeck-galgame-release
+            ./steamdeck-galgame-release
             
-            # Run directly on SteamDeck
-            ./steamdeck-galgame
+            # Debug (for troubleshooting):
+            chmod +x steamdeck-galgame-debug
+            ./steamdeck-galgame-debug
             ```
             
             ### Features:
@@ -90,14 +140,8 @@ jobs:
             - [x] No pip required
             - [x] All dependencies bundled
             - [x] Ready to use on SteamDeck
+            - [x] Debug and Release variants
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyinstaller-executable
-          path: dist/steamdeck-galgame*
-          retention-days: 30
