@@ -2,40 +2,25 @@
 
 为 SteamDeck 配置中文游戏环境的工具。
 
-## 快速开始
+## 快速开始 
+1. 下载最新版本：[RELEASE](https://github.com/yikolemon/easy-steamdeck-galgame/tags)
 
-### 运行应用
+2. 上传至SteamDeck内
 
-```bash
-python3 run.py
-```
+3. `chmod +x steamdeck-galgame`
 
-## 打包成 SteamDeck 可执行文件
+4. `./steamdeck-galgame`启动
 
-### 方式 1: 简单打包
+5. 输入密码（需要先手动创建用户并设置密码）
 
-```bash
-bash build_pyinstaller.sh
-# 输出: dist/steamdeck-galgame
-```
+   ![Screenshot_20260201_142412](assert/README/Screenshot_20260201_142412.png)
 
-### 方式 2: 交叉编译（支持多架构）
 
-```bash
-bash build_pyinstaller_crossplatform.sh        # 本机编译
-bash build_pyinstaller_crossplatform.sh x86_64 # 为 SteamDeck 编译
-```
 
-## SteamDeck 上使用
+6. 使用：
+   ![Screenshot_20260201_142539](assert/README/Screenshot_20260201_142539.png)
 
-下载可执行文件后：
 
-```bash
-chmod +x steamdeck-galgame
-./steamdeck-galgame
-```
-
-无需 Python 和任何依赖！
 
 ## 项目结构
 
@@ -46,6 +31,14 @@ src/
 └── utils/             # 工具函数
 ```
 
-## 许可证
 
-MIT
+
+# TODO
+
+- [ ] 多语言环境安装：
+  - [x] Chinese
+  - [ ] Japanese
+- [ ] 非Steam游戏附带属性导入
+
+
+

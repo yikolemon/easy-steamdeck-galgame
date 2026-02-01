@@ -4,12 +4,10 @@ TUI Main Program - Interactive terminal interface using Rich library
 
 import os
 import sys
-from typing import Optional, Tuple
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt, Confirm
-from rich.progress import track
 from rich.text import Text
 import threading
 
