@@ -23,6 +23,8 @@ datas = []
 datas += collect_data_files('requests')
 # Collect rich data files (important for unicode/styling)
 datas += collect_data_files('rich')
+# Collect rich unicode data specifically (required for TUI rendering)
+datas += collect_data_files('rich._unicode_data')
 
 a = Analysis(
     ['run.py'],
@@ -38,6 +40,8 @@ a = Analysis(
         'src.utils',
         'requests',
         'rich',
+        'rich._unicode_data',
+        'rich._unicode_data.unicode17-0-0',
     ],
     hookspath=[],
     hooksconfig={},
