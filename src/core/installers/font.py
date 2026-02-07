@@ -8,12 +8,7 @@ import tarfile
 import shutil
 import subprocess
 from typing import Tuple, Optional, Callable, Dict, List
-from src.utils import (
-    run_command,
-    run_script_as_root,
-    is_fonts_installed,
-    is_steamos_system,
-)
+from src.utils import is_fonts_installed
 from src.config import Config
 from .base import BaseInstaller
 from src.core.downloader import FontReleaseDownloader, GitHubAsset
@@ -183,52 +178,38 @@ class FontInstaller(BaseInstaller):
             else:
                 return False, f"ERROR: Unsupported file format: {self.font_path}"
 
-            # Build installation script
+            # Install fonts directly (no sudo required for ~/.fonts)
             step = "[2/3]" if not use_temp_dir else "[3/4]"
-            print(f"{step} Installing fonts (requires authentication)...")
-
-            script_lines = []
-
-            # Add SteamOS readonly disable if needed
-            if is_steamos_system():
-                script_lines.append("# Disable SteamOS readonly mode")
-                script_lines.append("steamos-readonly disable || true")
+            print(f"{step} Installing fonts to {self.fonts_dir}...")
 
             # Create fonts directory
-            script_lines.append("# Create fonts directory")
-            script_lines.append(f"mkdir -p '{self.fonts_dir}'")
+            os.makedirs(self.fonts_dir, exist_ok=True)
 
             # Copy each font file
-            script_lines.append("# Copy font files")
             font_count = 0
             for src_file, filename in font_files:
                 dst_file = os.path.join(self.fonts_dir, filename)
-                script_lines.append(
-                    f"cp -n '{src_file}' '{dst_file}' 2>/dev/null || true"
-                )
-                font_count += 1
+                # Only copy if destination doesn't exist (cp -n behavior)
+                if not os.path.exists(dst_file):
+                    try:
+                        shutil.copy2(src_file, dst_file)
+                        font_count += 1
+                    except Exception as e:
+                        print(f"Warning: Failed to copy {filename}: {e}")
+                else:
+                    font_count += 1  # Count existing files too
 
-            # Update font cache
-            script_lines.append("# Update font cache")
-            script_lines.append("fc-cache -fv >/dev/null 2>&1 || true")
-
-            # Re-enable SteamOS readonly mode
-            if is_steamos_system():
-                script_lines.append("# Re-enable SteamOS readonly mode")
-                script_lines.append("steamos-readonly enable || true")
-
-            # Execute script
-            script_content = "\n".join(script_lines)
-            success, msg = run_script_as_root(script_content)
+            # Update font cache (optional, runs without sudo)
+            try:
+                subprocess.run(["fc-cache", "-fv"], capture_output=True, timeout=30)
+            except Exception:
+                pass  # Font cache update is optional
 
             # Clean up temp directory
             step = "[3/3]" if not use_temp_dir else "[4/4]"
             print(f"{step} Cleaning up...")
             if use_temp_dir and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
-
-            if not success:
-                return False, f"ERROR: Font installation failed: {msg}"
 
             # Count installed fonts
             installed_count = 0

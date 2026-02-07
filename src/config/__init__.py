@@ -40,7 +40,7 @@ class Config:
     """Configuration management class"""
 
     # System configuration
-    FONTS_DIR = "/usr/share/fonts/galgame"
+    FONTS_DIR = None  # Will be set dynamically to ~/.fonts
     TEMP_EXTRACT_DIR = "/tmp/galgame_fonts_extract"
     CONFIG_FILE_NAME = ".steamdeck_galgame_config.json"
 
@@ -87,8 +87,8 @@ class Config:
 
     @classmethod
     def get_fonts_dir(cls) -> str:
-        """Get fonts directory"""
-        return cls.FONTS_DIR
+        """Get fonts directory (~/.fonts)"""
+        return os.path.join(cls._get_home_dir(), ".fonts")
 
     @classmethod
     def get_temp_dir(cls) -> str:
