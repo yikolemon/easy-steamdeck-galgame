@@ -1,4 +1,4 @@
-name: Build PyInstaller Executable for SteamDeck
+name: Build GUI Executable for SteamDeck
 
 on:
   push:
@@ -30,16 +30,17 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             python3-dev \
+            python3-tk \
             libx11-dev \
-            libxext-dev
+            libxext-dev \
+            libxft-dev \
+            libxss-dev
             
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-          # 确保 rich 及其所有数据文件都已正确安装
-          pip install --upgrade --force-reinstall rich
           
       - name: Build with PyInstaller (${{ matrix.build-type }})
         env:
@@ -49,13 +50,12 @@ jobs:
             
       - name: Verify executable (${{ matrix.build-type }})
         run: |
-          # Output is directly in dist/steamdeck-galgame-{type}
           EXECUTABLE="dist/steamdeck-galgame-${{ matrix.build-type }}"
           if [ -f "$EXECUTABLE" ]; then
             ls -lh "$EXECUTABLE"
             file "$EXECUTABLE"
           else
-            echo "❌ Executable not found at: $EXECUTABLE"
+            echo "Executable not found at: $EXECUTABLE"
             ls -lh dist/
             exit 1
           fi
@@ -90,9 +90,7 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          # Copy debug build
           cp all-artifacts/pyinstaller-debug/* release-assets/ || true
-          # Copy release build  
           cp all-artifacts/pyinstaller-release/* release-assets/ || true
           ls -lh release-assets/
           
@@ -105,30 +103,27 @@ jobs:
             release-assets/steamdeck-galgame-debug.tar.gz
             release-assets/steamdeck-galgame-release.tar.gz
           body: |
-            ## PyInstaller Executables for SteamDeck
+            ## SteamDeck Galgame Config Tool (GUI Version)
             
-            This release includes standalone executables that require NO Python installation!
+            Standalone GUI executables that require NO Python installation!
             
-            ### 🟢 Release Version (steamdeck-galgame-release)
+            ### Release Version (steamdeck-galgame-release)
             - Production-ready executable
             - Minimal logging (INFO level)
-            - Optimized for performance
             - Recommended for daily use
             
-            ### 🔵 Debug Version (steamdeck-galgame-debug)
+            ### Debug Version (steamdeck-galgame-debug)
             - Development/troubleshooting build
             - All debug logs enabled
-            - Shows detailed execution information
-            - Use when reporting issues or debugging
+            - Use when reporting issues
             
             ### Usage:
             ```bash
-            # Download either version
-            # Release (recommended):
+            # Download and run (Release recommended):
             chmod +x steamdeck-galgame-release
             ./steamdeck-galgame-release
             
-            # Debug (for troubleshooting):
+            # Debug version:
             chmod +x steamdeck-galgame-debug
             ./steamdeck-galgame-debug
             ```
@@ -138,7 +133,10 @@ jobs:
             - [x] No pip required
             - [x] All dependencies bundled
             - [x] Ready to use on SteamDeck
-            - [x] Debug and Release variants
+            - [x] GUI interface (Tkinter)
+            - [x] Chinese/Japanese locale installation
+            - [x] Font installation
+            - [x] Steam game integration
           draft: false
           prerelease: false
         env:

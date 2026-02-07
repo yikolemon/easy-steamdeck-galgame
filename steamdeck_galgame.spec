@@ -21,10 +21,6 @@ datas = []
 
 # Collect requests data files
 datas += collect_data_files('requests')
-# Collect rich data files (important for unicode/styling)
-datas += collect_data_files('rich')
-# Collect rich unicode data specifically (required for TUI rendering)
-datas += collect_data_files('rich._unicode_data')
 
 a = Analysis(
     ['run.py'],
@@ -33,15 +29,18 @@ a = Analysis(
     datas=datas,
     hiddenimports=[
         'src',
-        'src.tui',
+        'src.gui',
+        'src.gui.main',
         'src.core',
         'src.core.downloader',
         'src.core.installers',
         'src.utils',
+        'src.config',
         'requests',
-        'rich',
-        'rich._unicode_data',
-        'rich._unicode_data.unicode17-0-0',
+        'tkinter',
+        'tkinter.ttk',
+        'tkinter.messagebox',
+        'tkinter.filedialog',
     ],
     hookspath=[],
     hooksconfig={},
@@ -69,7 +68,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,  # GUI mode, no console window
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
