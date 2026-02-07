@@ -62,60 +62,47 @@ jobs:
       
       - name: Create release package (${{ matrix.build-type }})
         run: |
-          # Define names
           PACKAGE_NAME="steamdeck-galgame-${{ matrix.build-type }}"
           EXECUTABLE="dist/${PACKAGE_NAME}"
           PACKAGE_DIR="dist/${PACKAGE_NAME}-pkg"
           
-          # First rename executable to temp location
           mv "${EXECUTABLE}" "dist/steamdeck-galgame-temp"
-          
-          # Create package directory
           mkdir -p "${PACKAGE_DIR}"
-          
-          # Move executable into package directory with final name
           mv "dist/steamdeck-galgame-temp" "${PACKAGE_DIR}/steamdeck-galgame"
           
-          # Copy installation scripts and desktop file
           cp install_desktop.sh "${PACKAGE_DIR}/"
+          cp uninstall.sh "${PACKAGE_DIR}/"
           cp steamdeck-galgame.desktop "${PACKAGE_DIR}/"
           
-          # Create README for the package
           cat > "${PACKAGE_DIR}/README.txt" << 'READMEEOF'
-          SteamDeck Galgame - 中文游戏环境配置工具
-          ==========================================
+          SteamDeck Galgame - Chinese Game Environment Tool
+          ==================================================
           
-          快速开始:
-          ---------
-          1. 解压到任意目录
-          2. 运行安装脚本创建桌面快捷方式:
-             chmod +x install_desktop.sh
-             ./install_desktop.sh
+          Quick Start:
+          1. Extract to any directory
+          2. Run install script: ./install_desktop.sh
+          3. Launch from application menu
           
-          3. 从应用菜单启动 "SteamDeck Galgame" 或 "中文游戏助手"
+          Or run directly: ./steamdeck-galgame
           
-          或者直接运行:
-          -------------
-          chmod +x steamdeck-galgame
-          ./steamdeck-galgame
+          Uninstall:
+          - Remove shortcut only: ./uninstall.sh
+          - Remove all files: ./uninstall.sh --all
           
-          文件说明:
-          ---------
-          - steamdeck-galgame       : 主程序
-          - install_desktop.sh      : 桌面快捷方式安装脚本
-          - steamdeck-galgame.desktop : 桌面快捷方式模板
+          Files:
+          - steamdeck-galgame: Main program
+          - install_desktop.sh: Install desktop shortcut
+          - uninstall.sh: Uninstall script
           
-          更多信息请访问: https://github.com/yikolemon/steamdeck-galgame
+          More info: https://github.com/yikolemon/steamdeck-galgame
           READMEEOF
           
-          # Make scripts executable
           chmod +x "${PACKAGE_DIR}/steamdeck-galgame"
           chmod +x "${PACKAGE_DIR}/install_desktop.sh"
+          chmod +x "${PACKAGE_DIR}/uninstall.sh"
           
-          # Rename package directory to final name
           mv "${PACKAGE_DIR}" "dist/${PACKAGE_NAME}"
           
-          # List package contents
           echo "Package contents:"
           ls -lh "dist/${PACKAGE_NAME}/"
           
@@ -161,48 +148,59 @@ jobs:
           body: |
             ## SteamDeck Galgame Config Tool (GUI Version)
             
-            开箱即用的 SteamDeck 中文游戏环境配置工具！
+            Ready-to-use Chinese game environment configuration tool for SteamDeck!
             
-            ### 下载说明
+            ### Download
             
-            | 版本 | 说明 |
-            |------|------|
-            | `steamdeck-galgame-release.tar.gz` | **推荐** - 日常使用版本 |
-            | `steamdeck-galgame-debug.tar.gz` | 调试版本，用于问题排查 |
+            | Version | Description |
+            |---------|-------------|
+            | `steamdeck-galgame-release.tar.gz` | **Recommended** - Daily use |
+            | `steamdeck-galgame-debug.tar.gz` | Debug version for troubleshooting |
             
-            ### 安装步骤
+            ### Installation
             
             ```bash
-            # 1. 解压到任意目录
+            # 1. Extract
             tar -xzf steamdeck-galgame-release.tar.gz
             cd steamdeck-galgame-release
             
-            # 2. 安装桌面快捷方式（可选，推荐）
+            # 2. Install desktop shortcut (optional)
             ./install_desktop.sh
             
-            # 3. 从应用菜单启动，或直接运行：
+            # 3. Launch from menu or run directly
             ./steamdeck-galgame
             ```
             
-            ### 包内容
+            ### Uninstall
+            
+            ```bash
+            # Remove shortcut only
+            ./uninstall.sh
+            
+            # Remove all files
+            ./uninstall.sh --all
+            ```
+            
+            ### Package Contents
             
             ```
             steamdeck-galgame-release/
-            ├── steamdeck-galgame        # 主程序
-            ├── install_desktop.sh       # 桌面快捷方式安装脚本
-            ├── steamdeck-galgame.desktop # 桌面快捷方式模板
-            └── README.txt               # 说明文档
+            ├── steamdeck-galgame         # Main program
+            ├── install_desktop.sh        # Install shortcut
+            ├── uninstall.sh              # Uninstall script
+            ├── steamdeck-galgame.desktop # Desktop file
+            └── README.txt                # Documentation
             ```
             
-            ### 功能特性
+            ### Features
             
-            - [x] 无需安装 Python
-            - [x] 所有依赖已打包
-            - [x] 图形界面 (CustomTkinter)
-            - [x] 一键安装中文/日文语言环境
-            - [x] 一键安装中文字体
-            - [x] Steam 游戏启动参数管理
-            - [x] 支持添加到应用菜单
+            - [x] No Python required
+            - [x] All dependencies bundled
+            - [x] GUI interface (CustomTkinter)
+            - [x] One-click Chinese/Japanese locale install
+            - [x] One-click font installation
+            - [x] Steam game launch options management
+            - [x] Desktop integration support
           draft: false
           prerelease: false
         env:
