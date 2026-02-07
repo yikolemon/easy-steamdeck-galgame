@@ -540,13 +540,6 @@ class GUIApplication(ctk.CTk):
         dialog.geometry("380x220")
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
-
-        # Center dialog
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 380) // 2
-        y = self.winfo_y() + (self.winfo_height() - 220) // 2
-        dialog.geometry(f"+{x}+{y}")
 
         # Content
         ctk.CTkLabel(
@@ -595,6 +588,13 @@ class GUIApplication(ctk.CTk):
         ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
         ).pack(side="left", padx=10)
+
+        # Center and grab after content is created
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 380) // 2
+        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
 
     def _install_locale(self):
         """Install locale"""
@@ -695,13 +695,6 @@ class GUIApplication(ctk.CTk):
         dialog.title(t("select_font", "选择字体包", "Select Font Package"))
         dialog.geometry("500x350")
         dialog.transient(self)
-        dialog.grab_set()
-
-        # Center dialog
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 500) // 2
-        y = self.winfo_y() + (self.winfo_height() - 350) // 2
-        dialog.geometry(f"+{x}+{y}")
 
         dialog.grid_columnconfigure(0, weight=1)
         dialog.grid_rowconfigure(1, weight=1)
@@ -742,6 +735,13 @@ class GUIApplication(ctk.CTk):
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
         ).pack(side="left", padx=10)
 
+        # Center and grab after content is created
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 500) // 2
+        y = self.winfo_y() + (self.winfo_height() - 350) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
+
     def _download_and_install_font(self, asset):
         """Download font with progress dialog, then confirm before installing"""
         dialog = ctk.CTkToplevel(self)
@@ -749,13 +749,6 @@ class GUIApplication(ctk.CTk):
         dialog.geometry("480x220")
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
-
-        # Center dialog
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 480) // 2
-        y = self.winfo_y() + (self.winfo_height() - 220) // 2
-        dialog.geometry(f"+{x}+{y}")
 
         # Prevent closing during download
         dialog.protocol("WM_DELETE_WINDOW", lambda: None)
@@ -809,6 +802,13 @@ class GUIApplication(ctk.CTk):
             self.dl_btn_frame, text=t("cancel", "取消", "Cancel"), command=on_cancel
         )
         self.cancel_btn.pack()
+
+        # Center and grab after content is created
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 480) // 2
+        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
 
         def update_progress(downloaded: int, total: int):
             """Update progress bar from download callback"""
@@ -1064,13 +1064,6 @@ class GUIApplication(ctk.CTk):
         dialog.title(t("select_font", "选择字体包", "Select Font Package"))
         dialog.geometry("450x300")
         dialog.transient(self)
-        dialog.grab_set()
-
-        # Center
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 450) // 2
-        y = self.winfo_y() + (self.winfo_height() - 300) // 2
-        dialog.geometry(f"+{x}+{y}")
 
         dialog.grid_columnconfigure(0, weight=1)
         dialog.grid_rowconfigure(0, weight=1)
@@ -1122,6 +1115,13 @@ class GUIApplication(ctk.CTk):
         ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
         ).pack(side="left", padx=10)
+
+        # Center and grab after content is created
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 450) // 2
+        y = self.winfo_y() + (self.winfo_height() - 300) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
 
     def _update_launch_cmd(self):
         """Update launch command display"""
@@ -1263,13 +1263,6 @@ class GUIApplication(ctk.CTk):
         dialog.title(t("add_game", "添加游戏", "Add Game"))
         dialog.geometry("500x350")
         dialog.transient(self)
-        dialog.grab_set()
-
-        # Center
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 500) // 2
-        y = self.winfo_y() + (self.winfo_height() - 350) // 2
-        dialog.geometry(f"+{x}+{y}")
 
         dialog.grid_columnconfigure(0, weight=1)
 
@@ -1357,6 +1350,13 @@ class GUIApplication(ctk.CTk):
         ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
         ).pack(side="left", padx=10)
+
+        # Center and grab after content is created
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 500) // 2
+        y = self.winfo_y() + (self.winfo_height() - 350) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
 
 
 def main():
