@@ -1133,8 +1133,22 @@ class GUIApplication(ctk.CTk):
     def _install_fonts_local(self):
         """Install fonts from local file"""
         file_path = filedialog.askopenfilename(
-            title=t("select_font_file", "选择字体包", "Select Font Package"),
-            filetypes=[("ZIP files", "*.zip"), ("All files", "*.*")],
+            title=t(
+                "select_font_file",
+                "选择字体文件或压缩包",
+                "Select Font File or Archive",
+            ),
+            filetypes=[
+                (
+                    t("font_archives", "字体压缩包", "Font Archives"),
+                    "*.zip *.7z *.tar *.tar.gz *.tgz *.tar.bz2 *.tar.xz",
+                ),
+                (
+                    t("font_files", "字体文件", "Font Files"),
+                    "*.ttf *.otf *.ttc *.woff *.woff2",
+                ),
+                (t("all_files", "所有文件", "All Files"), "*.*"),
+            ],
         )
 
         if not file_path:
