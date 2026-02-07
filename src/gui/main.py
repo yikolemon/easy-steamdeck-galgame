@@ -205,6 +205,10 @@ class GUIApplication(ctk.CTk):
         self._create_tabview()
         self._create_log_area()
 
+        # Fix mouse wheel scrolling on Linux (X11 uses Button-4/5 instead of MouseWheel)
+        if sys.platform.startswith("linux"):
+            self._bind_linux_mousewheel()
+
         # Check if language needs to be selected
         if not self.target_language:
             self.after(100, self._show_language_dialog)
@@ -258,6 +262,49 @@ class GUIApplication(ctk.CTk):
             ctk.set_appearance_mode("dark")
         else:
             ctk.set_appearance_mode("light")
+
+    def _bind_linux_mousewheel(self):
+        """Bind mouse wheel events for Linux (X11 uses Button-4/5 instead of MouseWheel)"""
+
+        def _on_mousewheel_up(event):
+            """Handle mouse wheel scroll up on Linux"""
+            widget = event.widget
+            # Find the scrollable frame's canvas
+            canvas = self._find_scrollable_canvas(widget)
+            if canvas:
+                canvas.yview_scroll(-3, "units")
+
+        def _on_mousewheel_down(event):
+            """Handle mouse wheel scroll down on Linux"""
+            widget = event.widget
+            canvas = self._find_scrollable_canvas(widget)
+            if canvas:
+                canvas.yview_scroll(3, "units")
+
+        # Bind Button-4 (scroll up) and Button-5 (scroll down) for Linux/X11
+        self.bind_all("<Button-4>", _on_mousewheel_up, add="+")
+        self.bind_all("<Button-5>", _on_mousewheel_down, add="+")
+
+    def _find_scrollable_canvas(self, widget):
+        """Find the parent scrollable frame's canvas for a widget"""
+        current = widget
+        while current:
+            try:
+                # CTkScrollableFrame stores its canvas in _parent_canvas
+                if hasattr(current, "_parent_canvas"):
+                    canvas = current._parent_canvas
+                    # Verify we can scroll (content exceeds viewport)
+                    if canvas.yview() != (0.0, 1.0):
+                        return canvas
+                    return None
+                # Move to parent widget
+                if hasattr(current, "master") and current.master:
+                    current = current.master
+                else:
+                    break
+            except Exception:
+                break
+        return None
 
     def _create_status_bar(self):
         """Create status bar showing current states"""
