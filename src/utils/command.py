@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import logging
 import tempfile
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -90,13 +90,17 @@ def run_command(cmd: str, use_sudo: bool = False) -> Tuple[bool, str]:
         return False, error_msg
 
 
-def run_script_as_root(script_content: str) -> Tuple[bool, str]:
+def run_script_as_root(
+    script_content: str,
+    output_callback: Optional[Callable[[str], None]] = None,
+) -> Tuple[bool, str]:
     """
     Execute a shell script with root privileges using a single authentication prompt.
     This avoids multiple password prompts when running multiple privileged commands.
 
     Args:
         script_content: Shell script content to execute as root
+        output_callback: Optional callback function to receive real-time output lines
 
     Returns:
         (success_flag, output/error_message)
@@ -126,19 +130,45 @@ def run_script_as_root(script_content: str) -> Tuple[bool, str]:
             # Use clean environment to avoid PyInstaller library conflicts
             clean_env = get_clean_env()
 
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                check=False,
-                env=clean_env,
+            if output_callback:
+                # Real-time output mode using Popen
+                process = subprocess.Popen(
+                    cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=clean_env,
+                    bufsize=1,  # Line buffered
+                )
+
+                output_lines = []
+                for line in process.stdout:
+                    line = line.rstrip("\n\r")
+                    if line:
+                        output_lines.append(line)
+                        output_callback(line)
+
+                process.wait()
+                output = "\n".join(output_lines)
+                success = process.returncode == 0
+            else:
+                # Buffered mode (original behavior)
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env=clean_env,
+                )
+
+                output = result.stdout or result.stderr
+                success = result.returncode == 0
+
+            logger.info(
+                f"Script execution | Return code: {process.returncode if output_callback else result.returncode}"
             )
-
-            output = result.stdout or result.stderr
-            success = result.returncode == 0
-
-            logger.info(f"Script execution | Return code: {result.returncode}")
             if output:
                 logger.info(f"Output: {output[:200]}")
 

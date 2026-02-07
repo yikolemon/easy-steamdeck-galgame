@@ -83,7 +83,14 @@ class LocaleInstaller(BaseInstaller):
             # Execute all commands with a single authentication prompt
             log("Executing installation script (requires authentication)...")
             script_content = "\n".join(script_lines)
-            success, msg = run_script_as_root(script_content)
+
+            def script_output_callback(line: str):
+                """Forward script output to log callback"""
+                log(f"  {line}")
+
+            success, msg = run_script_as_root(
+                script_content, output_callback=script_output_callback
+            )
 
             if not success:
                 log(f"[ERROR] Installation failed: {msg}")
