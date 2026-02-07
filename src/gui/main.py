@@ -1141,11 +1141,11 @@ class GUIApplication(ctk.CTk):
             filetypes=[
                 (
                     t("font_archives", "字体压缩包", "Font Archives"),
-                    "*.zip *.7z *.tar *.tar.gz *.tgz *.tar.bz2 *.tar.xz",
+                    "*.zip *.ZIP *.7z *.7Z *.tar *.TAR *.tar.gz *.TAR.GZ *.tgz *.TGZ *.tar.bz2 *.tar.xz",
                 ),
                 (
                     t("font_files", "字体文件", "Font Files"),
-                    "*.ttf *.otf *.ttc *.woff *.woff2",
+                    "*.ttf *.TTF *.otf *.OTF *.ttc *.TTC *.woff *.WOFF *.woff2 *.WOFF2",
                 ),
                 (t("all_files", "所有文件", "All Files"), "*.*"),
             ],
