@@ -430,9 +430,25 @@ class GUIApplication(ctk.CTk):
             row=0, column=0, padx=10, pady=10, sticky="w"
         )
 
+        # Button frame - placed above games list for better visibility
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.grid(row=1, column=0, padx=10, pady=(5, 10), sticky="ew")
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("add_game", "添加游戏", "Add Game"),
+            command=self._browse_add_game,
+        ).grid(row=0, column=0, padx=5)
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("refresh_games", "刷新列表", "Refresh"),
+            command=self._refresh_games_list,
+        ).grid(row=0, column=1, padx=5)
+
         # Games frame
         games_frame = ctk.CTkFrame(scroll)
-        games_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        games_frame.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
         games_frame.grid_columnconfigure(0, weight=1)
 
         # Scrollable frame for games list
@@ -462,22 +478,6 @@ class GUIApplication(ctk.CTk):
             text=t("language", "语言", "Language"),
             font=ctk.CTkFont(weight="bold"),
         ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-        # Button frame
-        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-
-        ctk.CTkButton(
-            btn_frame,
-            text=t("add_game", "添加游戏", "Add Game"),
-            command=self._browse_add_game,
-        ).grid(row=0, column=0, padx=5)
-
-        ctk.CTkButton(
-            btn_frame,
-            text=t("refresh_games", "刷新列表", "Refresh"),
-            command=self._refresh_games_list,
-        ).grid(row=0, column=1, padx=5)
 
         # Initial refresh
         self.after(400, self._refresh_games_list)
