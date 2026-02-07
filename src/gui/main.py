@@ -6,7 +6,7 @@ import os
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from typing import Optional
 
 import customtkinter as ctk
@@ -28,6 +28,154 @@ from src.core.steam_manager import SteamManager
 # Configure CustomTkinter
 ctk.set_appearance_mode("System")  # Modes: "System", "Dark", "Light"
 ctk.set_default_color_theme("blue")  # Themes: "blue", "dark-blue", "green"
+
+
+class CTkMessageBox(ctk.CTkToplevel):
+    """Custom message box using CustomTkinter"""
+
+    def __init__(
+        self,
+        parent,
+        title: str = "Message",
+        message: str = "",
+        icon: str = "info",  # "info", "warning", "error", "question"
+        option_1: str = "OK",
+        option_2: Optional[str] = None,
+    ):
+        super().__init__(parent)
+        self.result = None
+
+        self.title(title)
+        self.resizable(False, False)
+        self.transient(parent)
+
+        # Icon colors
+        icon_colors = {
+            "info": "#3B8ED0",
+            "success": "#2FA572",
+            "warning": "#F0A30A",
+            "error": "#D32F2F",
+            "question": "#3B8ED0",
+        }
+        icon_symbols = {
+            "info": "ℹ",
+            "success": "✓",
+            "warning": "⚠",
+            "error": "✕",
+            "question": "?",
+        }
+
+        # Content frame
+        content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        content_frame.pack(padx=30, pady=25, fill="both", expand=True)
+
+        # Icon
+        icon_label = ctk.CTkLabel(
+            content_frame,
+            text=icon_symbols.get(icon, "ℹ"),
+            font=ctk.CTkFont(size=36, weight="bold"),
+            text_color=icon_colors.get(icon, "#3B8ED0"),
+        )
+        icon_label.pack(pady=(0, 15))
+
+        # Message
+        msg_label = ctk.CTkLabel(
+            content_frame,
+            text=message,
+            font=ctk.CTkFont(size=13),
+            wraplength=350,
+            justify="center",
+        )
+        msg_label.pack(pady=(0, 20))
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        btn_frame.pack()
+
+        if option_2:
+            ctk.CTkButton(
+                btn_frame,
+                text=option_1,
+                width=100,
+                command=lambda: self._on_click(option_1),
+            ).pack(side="left", padx=10)
+            ctk.CTkButton(
+                btn_frame,
+                text=option_2,
+                width=100,
+                fg_color="gray50",
+                hover_color="gray40",
+                command=lambda: self._on_click(option_2),
+            ).pack(side="left", padx=10)
+        else:
+            ctk.CTkButton(
+                btn_frame,
+                text=option_1,
+                width=120,
+                command=lambda: self._on_click(option_1),
+            ).pack()
+
+        # Calculate size and center
+        self.update_idletasks()
+        width = max(400, msg_label.winfo_reqwidth() + 60)
+        height = content_frame.winfo_reqheight() + 50
+        x = parent.winfo_x() + (parent.winfo_width() - width) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - height) // 2
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Grab after window is ready
+        self.after(100, lambda: self.grab_set())
+
+        # Handle close button
+        self.protocol("WM_DELETE_WINDOW", lambda: self._on_click(None))
+
+    def _on_click(self, value):
+        self.result = value
+        self.destroy()
+
+    def get_result(self):
+        self.wait_window()
+        return self.result
+
+
+def show_info(parent, title: str, message: str):
+    """Show info message box"""
+    dialog = CTkMessageBox(parent, title=title, message=message, icon="info")
+    dialog.get_result()
+
+
+def show_success(parent, title: str, message: str):
+    """Show success message box"""
+    dialog = CTkMessageBox(parent, title=title, message=message, icon="success")
+    dialog.get_result()
+
+
+def show_warning(parent, title: str, message: str):
+    """Show warning message box"""
+    dialog = CTkMessageBox(parent, title=title, message=message, icon="warning")
+    dialog.get_result()
+
+
+def show_error(parent, title: str, message: str):
+    """Show error message box"""
+    dialog = CTkMessageBox(parent, title=title, message=message, icon="error")
+    dialog.get_result()
+
+
+def ask_yes_no(parent, title: str, message: str) -> bool:
+    """Show yes/no question dialog, returns True if yes"""
+    yes_text = "是" if is_chinese() else "Yes"
+    no_text = "否" if is_chinese() else "No"
+    dialog = CTkMessageBox(
+        parent,
+        title=title,
+        message=message,
+        icon="question",
+        option_1=yes_text,
+        option_2=no_text,
+    )
+    result = dialog.get_result()
+    return result == yes_text
 
 
 class GUIApplication(ctk.CTk):
@@ -599,7 +747,8 @@ class GUIApplication(ctk.CTk):
     def _install_locale(self):
         """Install locale"""
         if not self.target_language:
-            messagebox.showwarning(
+            show_warning(
+                self,
                 t("warning", "警告", "Warning"),
                 t(
                     "select_lang_first",
@@ -614,14 +763,16 @@ class GUIApplication(ctk.CTk):
 
         # Check if already installed
         if check_locale_status(locale_code):
-            messagebox.showinfo(
+            show_info(
+                self,
                 t("info", "提示", "Info"),
                 t("locale_installed", "语言环境已安装", "Locale already installed"),
             )
             return
 
         # Confirm
-        if not messagebox.askyesno(
+        if not ask_yes_no(
+            self,
             t("confirm", "确认", "Confirm"),
             t(
                 "confirm_locale",
@@ -649,10 +800,10 @@ class GUIApplication(ctk.CTk):
         """Handle task completion"""
         if success:
             self._log(message, "success")
-            messagebox.showinfo(t("success", "成功", "Success"), message)
+            show_success(self, t("success", "成功", "Success"), message)
         else:
             self._log(message, "error")
-            messagebox.showerror(t("error", "错误", "Error"), message)
+            show_error(self, t("error", "错误", "Error"), message)
         self._refresh_status()
 
     def _install_fonts_github(self):
@@ -1024,7 +1175,8 @@ class GUIApplication(ctk.CTk):
         default_path = Config.get_default_font_path()
 
         if not default_path:
-            messagebox.showwarning(
+            show_warning(
+                self,
                 t("warning", "警告", "Warning"),
                 t(
                     "set_default_first",
@@ -1035,7 +1187,8 @@ class GUIApplication(ctk.CTk):
             return
 
         if not os.path.isdir(default_path):
-            messagebox.showerror(
+            show_error(
+                self,
                 t("error", "错误", "Error"),
                 t(
                     "path_not_exist",
@@ -1049,7 +1202,8 @@ class GUIApplication(ctk.CTk):
         zip_files = [f for f in os.listdir(default_path) if f.lower().endswith(".zip")]
 
         if not zip_files:
-            messagebox.showinfo(
+            show_info(
+                self,
                 t("info", "提示", "Info"),
                 t(
                     "no_zip_found",
@@ -1205,7 +1359,8 @@ class GUIApplication(ctk.CTk):
 
     def _remove_game(self, game_name: str):
         """Remove a game from the list"""
-        if not messagebox.askyesno(
+        if not ask_yes_no(
+            self,
             t("confirm", "确认", "Confirm"),
             t(
                 "confirm_remove_game",
@@ -1232,7 +1387,8 @@ class GUIApplication(ctk.CTk):
     def _browse_add_game(self):
         """Browse and add game to Steam"""
         if not self.target_language:
-            messagebox.showwarning(
+            show_warning(
+                self,
                 t("warning", "警告", "Warning"),
                 t(
                     "select_lang_first",
@@ -1300,7 +1456,8 @@ class GUIApplication(ctk.CTk):
         def on_add():
             game_name = name_entry.get().strip()
             if not game_name:
-                messagebox.showwarning(
+                show_warning(
+                    self,
                     t("warning", "警告", "Warning"),
                     t("enter_name", "请输入游戏名称", "Please enter game name"),
                 )
@@ -1367,7 +1524,7 @@ def main():
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        messagebox.showerror("Error", f"Application error: {str(e)}")
+        show_error(app, "Error", f"Application error: {str(e)}")
         sys.exit(1)
 
 
