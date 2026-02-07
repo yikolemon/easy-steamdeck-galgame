@@ -100,15 +100,26 @@ class FontInstaller(BaseInstaller):
         Collect all font files from directory recursively
 
         Returns:
-            List of (source_path, filename) tuples
+            List of (source_path, normalized_filename) tuples
+            Filename extension is normalized to lowercase
         """
         font_files = []
         for root, dirs, files in os.walk(source_dir):
             for file in files:
                 if self._is_font_file(file):
                     src_file = os.path.join(root, file)
-                    font_files.append((src_file, file))
+                    normalized_name = self._normalize_font_filename(file)
+                    font_files.append((src_file, normalized_name))
         return font_files
+
+    def _normalize_font_filename(self, filename: str) -> str:
+        """
+        Normalize font filename by converting extension to lowercase
+
+        Example: "Font.TTF" -> "Font.ttf"
+        """
+        name, ext = os.path.splitext(filename)
+        return name + ext.lower()
 
     def install(
         self,
@@ -140,7 +151,9 @@ class FontInstaller(BaseInstaller):
             # Handle direct font file
             if self._is_font_file(self.font_path):
                 print("[1/3] Processing font file...")
-                font_files = [(self.font_path, os.path.basename(self.font_path))]
+                original_name = os.path.basename(self.font_path)
+                normalized_name = self._normalize_font_filename(original_name)
+                font_files = [(self.font_path, normalized_name)]
                 use_temp_dir = False
 
             # Handle archive file
