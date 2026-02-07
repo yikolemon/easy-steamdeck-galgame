@@ -100,11 +100,11 @@ class GUIApplication:
         self.notebook = ttk.Notebook(main_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        # Create tabs
+        # Create tabs (Steam Games first as default)
+        self._create_steam_tab()
         self._create_locale_tab()
         self._create_font_tab()
         self._create_launcher_tab()
-        self._create_steam_tab()
 
         # Log output area
         self._create_log_area(main_frame)
@@ -379,18 +379,92 @@ class GUIApplication:
         # Description
         desc_text = t(
             "steam_desc",
-            "添加非Steam游戏到Steam库，并自动配置中文/日文启动环境。",
-            "Add non-Steam games to Steam library with auto-configured Chinese/Japanese launch environment.",
+            "管理由本程序添加到Steam库的游戏。",
+            "Manage games added to Steam library by this program.",
         )
         ttk.Label(tab, text=desc_text, wraplength=600).pack(anchor=tk.W, pady=10)
 
-        # Search paths
+        # Games list section
+        games_frame = ttk.LabelFrame(
+            tab,
+            text=t("managed_games", "已添加的游戏", "Managed Games"),
+            padding="10",
+        )
+        games_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Games treeview with scrollbar
+        tree_frame = ttk.Frame(games_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Scrollbars
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical")
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
+        hsb.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Treeview for games
+        columns = ("name", "path", "language")
+        self.games_tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            yscrollcommand=vsb.set,
+            xscrollcommand=hsb.set,
+            height=8,
+        )
+
+        # Configure scrollbars
+        vsb.config(command=self.games_tree.yview)
+        hsb.config(command=self.games_tree.xview)
+
+        # Column headings
+        self.games_tree.heading("name", text=t("game_name", "游戏名称", "Game Name"))
+        self.games_tree.heading("path", text=t("game_path", "路径", "Path"))
+        self.games_tree.heading("language", text=t("language", "语言", "Language"))
+
+        # Column widths
+        self.games_tree.column("name", width=200, minwidth=150)
+        self.games_tree.column("path", width=300, minwidth=200)
+        self.games_tree.column("language", width=100, minwidth=80)
+
+        self.games_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Game action buttons
+        game_btn_frame = ttk.Frame(games_frame)
+        game_btn_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Button(
+            game_btn_frame,
+            text=t("add_game", "添加游戏", "Add Game"),
+            command=self._browse_add_game,
+        ).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(
+            game_btn_frame,
+            text=t("launch_game", "启动游戏", "Launch Game"),
+            command=self._launch_selected_game,
+        ).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(
+            game_btn_frame,
+            text=t("remove_game", "移除游戏", "Remove Game"),
+            command=self._remove_selected_game,
+        ).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(
+            game_btn_frame,
+            text=t("refresh_games", "刷新列表", "Refresh"),
+            command=self._refresh_games_list,
+        ).pack(side=tk.LEFT, padx=5)
+
+        # Search paths section (collapsed)
         paths_frame = ttk.LabelFrame(
             tab,
             text=t("search_paths", "游戏搜索路径", "Game Search Paths"),
             padding="10",
         )
-        paths_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        paths_frame.pack(fill=tk.X, pady=5)
 
         # Path listbox with scrollbar
         list_frame = ttk.Frame(paths_frame)
@@ -400,7 +474,7 @@ class GUIApplication:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.paths_listbox = tk.Listbox(
-            list_frame, yscrollcommand=scrollbar.set, height=6
+            list_frame, yscrollcommand=scrollbar.set, height=4
         )
         self.paths_listbox.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.paths_listbox.yview)
@@ -419,26 +493,9 @@ class GUIApplication:
             text=t("remove_path", "删除路径", "Remove Path"),
             command=self._remove_search_path,
         ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
-            path_btn_frame,
-            text=t("refresh_paths", "刷新", "Refresh"),
-            command=self._refresh_paths,
-        ).pack(side=tk.LEFT, padx=5)
-
-        # Add game button
-        add_game_frame = ttk.Frame(tab)
-        add_game_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(
-            add_game_frame,
-            text=t(
-                "browse_add_game", "浏览并添加游戏到Steam", "Browse & Add Game to Steam"
-            ),
-            style="Big.TButton",
-            command=self._browse_add_game,
-        ).pack()
 
         # Initial refresh
+        self.root.after(400, self._refresh_games_list)
         self.root.after(400, self._refresh_paths)
 
     def _create_log_area(self, parent):
@@ -925,6 +982,123 @@ class GUIApplication:
         else:
             self._log(msg, "error")
 
+    def _refresh_games_list(self):
+        """Refresh managed games list"""
+        # Clear existing items
+        for item in self.games_tree.get_children():
+            self.games_tree.delete(item)
+
+        # Get managed games from config
+        managed_games = Config.get_managed_games()
+
+        if not managed_games:
+            # Insert placeholder message
+            self.games_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    t("no_games", "暂无游戏", "No games yet"),
+                    t(
+                        "use_add_button",
+                        "使用下方按钮添加游戏",
+                        "Use button below to add games",
+                    ),
+                    "",
+                ),
+            )
+            return
+
+        # Populate with game data
+        for game in managed_games:
+            game_name = game.get("name", "Unknown")
+            game_path = game.get("exe_path", "")
+            game_lang = game.get("language", "")
+
+            # Convert language code to display name
+            if game_lang == TargetLanguage.CHINESE:
+                lang_display = "简体中文" if is_chinese() else "Chinese"
+            elif game_lang == TargetLanguage.JAPANESE:
+                lang_display = "日本語" if is_chinese() else "Japanese"
+            else:
+                lang_display = game_lang
+
+            self.games_tree.insert(
+                "", tk.END, values=(game_name, game_path, lang_display)
+            )
+
+    def _launch_selected_game(self):
+        """Launch the selected game"""
+        selection = self.games_tree.selection()
+        if not selection:
+            messagebox.showwarning(
+                t("warning", "警告", "Warning"),
+                t(
+                    "select_game_first",
+                    "请先选择一个游戏",
+                    "Please select a game first",
+                ),
+            )
+            return
+
+        # Get selected game info
+        item = self.games_tree.item(selection[0])
+        game_name = item["values"][0]
+
+        # Placeholder: Show not implemented message
+        messagebox.showinfo(
+            t("info", "提示", "Info"),
+            t(
+                "feature_coming_soon",
+                f"启动游戏功能即将推出\n游戏: {game_name}",
+                f"Launch game feature coming soon\nGame: {game_name}",
+            ),
+        )
+
+    def _remove_selected_game(self):
+        """Remove the selected game from managed list"""
+        selection = self.games_tree.selection()
+        if not selection:
+            messagebox.showwarning(
+                t("warning", "警告", "Warning"),
+                t(
+                    "select_game_first",
+                    "请先选择一个游戏",
+                    "Please select a game first",
+                ),
+            )
+            return
+
+        # Get selected game info
+        item = self.games_tree.item(selection[0])
+        game_name = item["values"][0]
+
+        # Confirm removal
+        if not messagebox.askyesno(
+            t("confirm", "确认", "Confirm"),
+            t(
+                "confirm_remove_game",
+                f"确认从列表中移除游戏?\n{game_name}\n\n注意:这只会从本程序的管理列表中移除,不会从Steam库中删除。",
+                f"Remove game from managed list?\n{game_name}\n\nNote: This only removes from this program's list, not from Steam library.",
+            ),
+        ):
+            return
+
+        # Remove from config
+        managed_games = Config.get_managed_games()
+        managed_games = [g for g in managed_games if g.get("name") != game_name]
+        Config.set_managed_games(managed_games)
+
+        # Refresh display
+        self._refresh_games_list()
+        self._log(
+            t(
+                "game_removed",
+                f"游戏已从列表移除: {game_name}",
+                f"Game removed from list: {game_name}",
+            ),
+            "success",
+        )
+
     def _browse_add_game(self):
         """Browse and add game to Steam"""
         if not self.target_language:
@@ -1013,6 +1187,19 @@ class GUIApplication:
                         app_name=game_name,
                         launch_options=launch_options,
                     )
+
+                    # If successful, save to managed games list
+                    if success:
+                        game_data = {
+                            "name": game_name,
+                            "exe_path": file_path,
+                            "language": self.target_language,
+                            "launch_options": launch_options,
+                        }
+                        Config.add_managed_game(game_data)
+                        # Refresh games list on main thread
+                        self.root.after(0, self._refresh_games_list)
+
                     self.root.after(0, lambda: self._on_task_complete(success, msg))
                 except Exception as e:
                     self.root.after(0, lambda: self._on_task_complete(False, str(e)))
