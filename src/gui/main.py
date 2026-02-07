@@ -1,13 +1,15 @@
 """
-GUI Main Application - Tkinter-based graphical interface
+GUI Main Application - CustomTkinter-based modern graphical interface
 """
 
 import os
 import sys
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from typing import Optional, Callable
+from tkinter import filedialog, messagebox
+from typing import Optional
+
+import customtkinter as ctk
 
 from src.core.installers import (
     setup_locale,
@@ -16,7 +18,6 @@ from src.core.installers import (
     check_fonts_status,
     get_fonts_count,
     list_available_fonts,
-    download_and_install_fonts,
 )
 from src.utils.locale import t, is_chinese
 from src.core.game_launcher import get_locale_command
@@ -24,189 +25,139 @@ from src.config import Config, TargetLanguage
 from src.core.steam_manager import SteamManager
 
 
-class ScrollableFrame(ttk.Frame):
-    """A scrollable frame container that can be used in dialogs"""
-
-    def __init__(self, container, *args, **kwargs):
-        super().__init__(container, *args, **kwargs)
-
-        # Create canvas and scrollbar
-        self.canvas = tk.Canvas(self, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(
-            self, orient="vertical", command=self.canvas.yview
-        )
-        self.scrollable_frame = ttk.Frame(self.canvas)
-
-        # Configure scrolling
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
-        )
-
-        self.canvas_frame = self.canvas.create_window(
-            (0, 0), window=self.scrollable_frame, anchor="nw"
-        )
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        # Bind canvas resize to adjust frame width
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-
-        # Pack canvas and scrollbar
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Bind mousewheel
-        self.scrollable_frame.bind("<Enter>", self._bind_mousewheel)
-        self.scrollable_frame.bind("<Leave>", self._unbind_mousewheel)
-
-    def _on_canvas_configure(self, event):
-        """Adjust the scrollable frame width to match canvas"""
-        self.canvas.itemconfig(self.canvas_frame, width=event.width)
-
-    def _bind_mousewheel(self, event):
-        """Bind mousewheel when mouse enters"""
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
-        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
-
-    def _unbind_mousewheel(self, event):
-        """Unbind mousewheel when mouse leaves"""
-        self.canvas.unbind_all("<MouseWheel>")
-        self.canvas.unbind_all("<Button-4>")
-        self.canvas.unbind_all("<Button-5>")
-
-    def _on_mousewheel(self, event):
-        """Handle mousewheel scroll"""
-        if event.num == 4:  # Linux scroll up
-            self.canvas.yview_scroll(-1, "units")
-        elif event.num == 5:  # Linux scroll down
-            self.canvas.yview_scroll(1, "units")
-        else:  # Windows/macOS
-            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+# Configure CustomTkinter
+ctk.set_appearance_mode("System")  # Modes: "System", "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Themes: "blue", "dark-blue", "green"
 
 
-class GUIApplication:
-    """Main GUI Application using Tkinter"""
+class GUIApplication(ctk.CTk):
+    """Main GUI Application using CustomTkinter"""
 
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("SteamDeck Galgame Config Tool")
-        self.root.geometry("800x600")
-        self.root.minsize(700, 500)
+        super().__init__()
+
+        # Window configuration
+        self.title("SteamDeck Galgame Config Tool")
+        self.geometry("900x700")
+        self.minsize(800, 600)
 
         # Target language
         self.target_language: Optional[str] = Config.get_target_language()
 
-        # Setup style
-        self._setup_style()
+        # Configure grid weights for responsive layout
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # Header
+        self.grid_rowconfigure(1, weight=0)  # Status
+        self.grid_rowconfigure(2, weight=1)  # Main content (tabview)
+        self.grid_rowconfigure(3, weight=0)  # Log area
 
         # Create main UI
-        self._create_ui()
+        self._create_header()
+        self._create_status_bar()
+        self._create_tabview()
+        self._create_log_area()
 
         # Check if language needs to be selected
         if not self.target_language:
-            self.root.after(100, self._show_language_dialog)
+            self.after(100, self._show_language_dialog)
 
-    def _setup_style(self):
-        """Setup ttk styles"""
-        style = ttk.Style()
+    def _create_header(self):
+        """Create header with title and language button"""
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.grid(row=0, column=0, padx=20, pady=(15, 5), sticky="ew")
+        header_frame.grid_columnconfigure(0, weight=1)
 
-        # Try to use a nicer theme
-        available_themes = style.theme_names()
-        for theme in ["clam", "alt", "default"]:
-            if theme in available_themes:
-                style.theme_use(theme)
-                break
-
-        # Configure styles
-        style.configure("Title.TLabel", font=("sans-serif", 16, "bold"))
-        style.configure("Header.TLabel", font=("sans-serif", 12, "bold"))
-        style.configure("Status.TLabel", font=("sans-serif", 10))
-        style.configure("Big.TButton", font=("sans-serif", 11), padding=10)
-
-    def _create_ui(self):
-        """Create main UI layout"""
-        # Main container
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        # Header
-        header_frame = ttk.Frame(main_frame)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
-
+        # Title
         title_text = (
             "SteamDeck 游戏环境配置工具"
             if is_chinese()
             else "SteamDeck Game Environment Config Tool"
         )
-        title_label = ttk.Label(header_frame, text=title_text, style="Title.TLabel")
-        title_label.pack(side=tk.LEFT)
+        title_label = ctk.CTkLabel(
+            header_frame, text=title_text, font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.grid(row=0, column=0, sticky="w")
+
+        # Language and theme buttons
+        btn_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        btn_frame.grid(row=0, column=1, sticky="e")
+
+        # Theme switch
+        self.theme_switch = ctk.CTkSwitch(
+            btn_frame,
+            text=t("dark_mode", "深色模式", "Dark Mode"),
+            command=self._toggle_theme,
+            onvalue="dark",
+            offvalue="light",
+        )
+        self.theme_switch.grid(row=0, column=0, padx=10)
+        if ctk.get_appearance_mode().lower() == "dark":
+            self.theme_switch.select()
 
         # Language button
-        lang_btn_text = "切换语言" if is_chinese() else "Change Language"
-        self.lang_btn = ttk.Button(
-            header_frame, text=lang_btn_text, command=self._show_language_dialog
+        lang_btn_text = "切换语言" if is_chinese() else "Language"
+        self.lang_btn = ctk.CTkButton(
+            btn_frame,
+            text=lang_btn_text,
+            width=100,
+            command=self._show_language_dialog,
         )
-        self.lang_btn.pack(side=tk.RIGHT)
+        self.lang_btn.grid(row=0, column=1)
 
-        # Status bar
-        self._create_status_bar(main_frame)
+    def _toggle_theme(self):
+        """Toggle between light and dark theme"""
+        if self.theme_switch.get() == "dark":
+            ctk.set_appearance_mode("dark")
+        else:
+            ctk.set_appearance_mode("light")
 
-        # Notebook for tabs
-        self.notebook = ttk.Notebook(main_frame)
-        self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
-
-        # Create tabs (Steam Games first as default)
-        self._create_steam_tab()
-        self._create_locale_tab()
-        self._create_font_tab()
-        self._create_launcher_tab()
-
-        # Log output area
-        self._create_log_area(main_frame)
-
-    def _create_status_bar(self, parent):
+    def _create_status_bar(self):
         """Create status bar showing current states"""
-        status_frame = ttk.LabelFrame(
-            parent, text=t("status", "系统状态", "System Status"), padding="5"
-        )
-        status_frame.pack(fill=tk.X, pady=(0, 5))
+        status_frame = ctk.CTkFrame(self)
+        status_frame.grid(row=1, column=0, padx=20, pady=5, sticky="ew")
 
-        # Status labels
-        status_grid = ttk.Frame(status_frame)
-        status_grid.pack(fill=tk.X)
+        # Configure grid for even spacing
+        for i in range(7):
+            status_frame.grid_columnconfigure(i, weight=1 if i % 2 == 1 else 0)
 
         # Target language
-        ttk.Label(
-            status_grid, text=t("target_lang", "目标语言:", "Target Language:")
-        ).grid(row=0, column=0, sticky=tk.W, padx=5)
-        self.lang_status = ttk.Label(status_grid, text="--", style="Status.TLabel")
-        self.lang_status.grid(row=0, column=1, sticky=tk.W, padx=5)
+        ctk.CTkLabel(
+            status_frame,
+            text=t("target_lang", "目标语言:", "Target Language:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=0, padx=(15, 5), pady=10, sticky="w")
+        self.lang_status = ctk.CTkLabel(status_frame, text="--")
+        self.lang_status.grid(row=0, column=1, padx=5, pady=10, sticky="w")
 
         # Locale status
-        ttk.Label(status_grid, text=t("locale_status", "语言环境:", "Locale:")).grid(
-            row=0, column=2, sticky=tk.W, padx=5
-        )
-        self.locale_status = ttk.Label(status_grid, text="--", style="Status.TLabel")
-        self.locale_status.grid(row=0, column=3, sticky=tk.W, padx=5)
+        ctk.CTkLabel(
+            status_frame,
+            text=t("locale_status", "语言环境:", "Locale:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=2, padx=(15, 5), pady=10, sticky="w")
+        self.locale_status = ctk.CTkLabel(status_frame, text="--")
+        self.locale_status.grid(row=0, column=3, padx=5, pady=10, sticky="w")
 
         # Font status
-        ttk.Label(status_grid, text=t("font_status", "字体:", "Fonts:")).grid(
-            row=0, column=4, sticky=tk.W, padx=5
-        )
-        self.font_status = ttk.Label(status_grid, text="--", style="Status.TLabel")
-        self.font_status.grid(row=0, column=5, sticky=tk.W, padx=5)
+        ctk.CTkLabel(
+            status_frame,
+            text=t("font_status", "字体:", "Fonts:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=4, padx=(15, 5), pady=10, sticky="w")
+        self.font_status = ctk.CTkLabel(status_frame, text="--")
+        self.font_status.grid(row=0, column=5, padx=5, pady=10, sticky="w")
 
         # Refresh button
-        refresh_btn = ttk.Button(
-            status_grid,
+        refresh_btn = ctk.CTkButton(
+            status_frame,
             text=t("refresh", "刷新", "Refresh"),
+            width=80,
             command=self._refresh_status,
         )
-        refresh_btn.grid(row=0, column=6, padx=10)
+        refresh_btn.grid(row=0, column=6, padx=15, pady=10)
 
         # Initial refresh
-        self.root.after(200, self._refresh_status)
+        self.after(200, self._refresh_status)
 
     def _refresh_status(self):
         """Refresh status display"""
@@ -215,39 +166,125 @@ class GUIApplication:
             lang_name = TargetLanguage.get_name(
                 self.target_language, "zh" if is_chinese() else "en"
             )
-            self.lang_status.config(text=lang_name, foreground="blue")
+            self.lang_status.configure(text=lang_name, text_color="#3B8ED0")
         else:
-            self.lang_status.config(
-                text=t("not_set", "未设置", "Not Set"), foreground="gray"
+            self.lang_status.configure(
+                text=t("not_set", "未设置", "Not Set"), text_color="gray"
             )
 
         # Locale status
         if self.target_language:
             locale_code = TargetLanguage.get_locale(self.target_language)
             if check_locale_status(locale_code):
-                self.locale_status.config(text="✓ OK", foreground="green")
+                self.locale_status.configure(text="✓ OK", text_color="#2FA572")
             else:
-                self.locale_status.config(
+                self.locale_status.configure(
                     text="✗ " + t("not_installed", "未安装", "Not Installed"),
-                    foreground="red",
+                    text_color="#E74C3C",
                 )
         else:
-            self.locale_status.config(text="--", foreground="gray")
+            self.locale_status.configure(text="--", text_color="gray")
 
         # Font status
         if check_fonts_status():
             count = get_fonts_count()
-            self.font_status.config(text=f"✓ OK ({count})", foreground="green")
+            self.font_status.configure(text=f"✓ OK ({count})", text_color="#2FA572")
         else:
-            self.font_status.config(
+            self.font_status.configure(
                 text="✗ " + t("not_installed", "未安装", "Not Installed"),
-                foreground="red",
+                text_color="#E74C3C",
             )
+
+    def _create_tabview(self):
+        """Create main tabview with all feature tabs"""
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.grid(row=2, column=0, padx=20, pady=5, sticky="nsew")
+
+        # Create tabs
+        self.tab_steam = self.tabview.add(t("steam_tab", "Steam游戏", "Steam Games"))
+        self.tab_locale = self.tabview.add(t("locale_tab", "语言环境", "Locale"))
+        self.tab_fonts = self.tabview.add(t("font_tab", "字体安装", "Fonts"))
+        self.tab_launcher = self.tabview.add(
+            t("launcher_tab", "启动选项", "Launch Options")
+        )
+
+        # Configure tab content
+        self._create_steam_tab()
+        self._create_locale_tab()
+        self._create_font_tab()
+        self._create_launcher_tab()
+
+    def _create_steam_tab(self):
+        """Create Steam game management tab"""
+        tab = self.tab_steam
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=1)
+
+        # Description
+        desc_text = t(
+            "steam_desc",
+            "管理由本程序添加到Steam库的游戏。",
+            "Manage games added to Steam library by this program.",
+        )
+        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+            row=0, column=0, padx=10, pady=10, sticky="w"
+        )
+
+        # Games frame
+        games_frame = ctk.CTkFrame(tab)
+        games_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        games_frame.grid_columnconfigure(0, weight=1)
+        games_frame.grid_rowconfigure(0, weight=1)
+
+        # Scrollable frame for games list
+        self.games_scroll = ctk.CTkScrollableFrame(
+            games_frame, label_text=t("managed_games", "已添加的游戏", "Managed Games")
+        )
+        self.games_scroll.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.games_scroll.grid_columnconfigure(0, weight=2)
+        self.games_scroll.grid_columnconfigure(1, weight=3)
+        self.games_scroll.grid_columnconfigure(2, weight=1)
+
+        # Header row
+        ctk.CTkLabel(
+            self.games_scroll,
+            text=t("game_name", "游戏名称", "Game Name"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ctk.CTkLabel(
+            self.games_scroll,
+            text=t("game_path", "路径", "Path"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        ctk.CTkLabel(
+            self.games_scroll,
+            text=t("language", "语言", "Language"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+        # Button frame
+        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("add_game", "添加游戏", "Add Game"),
+            command=self._browse_add_game,
+        ).grid(row=0, column=0, padx=5)
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("refresh_games", "刷新列表", "Refresh"),
+            command=self._refresh_games_list,
+        ).grid(row=0, column=1, padx=5)
+
+        # Initial refresh
+        self.after(400, self._refresh_games_list)
 
     def _create_locale_tab(self):
         """Create locale installation tab"""
-        tab = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(tab, text=t("locale_tab", "语言环境", "Locale"))
+        tab = self.tab_locale
+        tab.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -255,13 +292,19 @@ class GUIApplication:
             "安装系统语言环境，使游戏能够正确显示中文/日文。\n此操作需要root权限，将会修改系统文件。",
             "Install system locale to display Chinese/Japanese in games.\nThis requires root permission and will modify system files.",
         )
-        ttk.Label(tab, text=desc_text, wraplength=600).pack(anchor=tk.W, pady=10)
-
-        # Steps description
-        steps_frame = ttk.LabelFrame(
-            tab, text=t("steps", "操作步骤", "Steps"), padding="10"
+        ctk.CTkLabel(tab, text=desc_text, wraplength=700, justify="left").grid(
+            row=0, column=0, padx=20, pady=15, sticky="w"
         )
-        steps_frame.pack(fill=tk.X, pady=10)
+
+        # Steps frame
+        steps_frame = ctk.CTkFrame(tab)
+        steps_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+
+        ctk.CTkLabel(
+            steps_frame,
+            text=t("steps", "操作步骤", "Steps"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
 
         steps = [
             t("step1", "1. 禁用 SteamOS 只读模式", "1. Disable SteamOS read-only mode"),
@@ -270,25 +313,28 @@ class GUIApplication:
             t("step4", "4. 生成语言环境", "4. Generate locale"),
             t("step5", "5. 恢复 SteamOS 只读模式", "5. Restore SteamOS read-only mode"),
         ]
-        for step in steps:
-            ttk.Label(steps_frame, text=step).pack(anchor=tk.W)
+        for i, step in enumerate(steps):
+            ctk.CTkLabel(steps_frame, text=step).grid(
+                row=i + 1, column=0, padx=25, pady=3, sticky="w"
+            )
+
+        # Spacer
+        ctk.CTkLabel(steps_frame, text="").grid(row=len(steps) + 1, column=0, pady=5)
 
         # Install button
-        btn_frame = ttk.Frame(tab)
-        btn_frame.pack(pady=20)
-
-        install_btn = ttk.Button(
-            btn_frame,
+        install_btn = ctk.CTkButton(
+            tab,
             text=t("install_locale", "安装语言环境", "Install Locale"),
-            style="Big.TButton",
+            font=ctk.CTkFont(size=14),
+            height=45,
             command=self._install_locale,
         )
-        install_btn.pack()
+        install_btn.grid(row=2, column=0, padx=20, pady=20)
 
     def _create_font_tab(self):
         """Create font installation tab"""
-        tab = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(tab, text=t("font_tab", "字体安装", "Fonts"))
+        tab = self.tab_fonts
+        tab.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -296,69 +342,76 @@ class GUIApplication:
             "安装中文/日文字体，确保游戏能够正确显示文字。",
             "Install Chinese/Japanese fonts for proper text display in games.",
         )
-        ttk.Label(tab, text=desc_text, wraplength=600).pack(anchor=tk.W, pady=10)
-
-        # Installation options
-        options_frame = ttk.LabelFrame(
-            tab,
-            text=t("install_method", "安装方式", "Installation Method"),
-            padding="10",
+        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+            row=0, column=0, padx=20, pady=15, sticky="w"
         )
-        options_frame.pack(fill=tk.X, pady=10)
+
+        # Options frame
+        options_frame = ctk.CTkFrame(tab)
+        options_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        options_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            options_frame,
+            text=t("install_method", "安装方式", "Installation Method"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, columnspan=3, padx=15, pady=(15, 10), sticky="w")
 
         # GitHub download
-        github_frame = ttk.Frame(options_frame)
-        github_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(
-            github_frame, text=t("from_github", "从 GitHub 下载:", "From GitHub:")
-        ).pack(side=tk.LEFT)
-        ttk.Button(
-            github_frame,
+        ctk.CTkLabel(
+            options_frame, text=t("from_github", "从 GitHub 下载:", "From GitHub:")
+        ).grid(row=1, column=0, padx=(25, 10), pady=10, sticky="w")
+        ctk.CTkButton(
+            options_frame,
             text=t("download", "下载安装", "Download & Install"),
             command=self._install_fonts_github,
-        ).pack(side=tk.LEFT, padx=10)
+        ).grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
         # Local file
-        local_frame = ttk.Frame(options_frame)
-        local_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(
-            local_frame, text=t("from_local", "从本地文件:", "From Local File:")
-        ).pack(side=tk.LEFT)
-        ttk.Button(
-            local_frame,
+        ctk.CTkLabel(
+            options_frame, text=t("from_local", "从本地文件:", "From Local File:")
+        ).grid(row=2, column=0, padx=(25, 10), pady=10, sticky="w")
+        ctk.CTkButton(
+            options_frame,
             text=t("browse", "浏览...", "Browse..."),
             command=self._install_fonts_local,
-        ).pack(side=tk.LEFT, padx=10)
+        ).grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
         # Default path
-        default_frame = ttk.Frame(options_frame)
-        default_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(
-            default_frame, text=t("default_path", "默认路径:", "Default Path:")
-        ).pack(side=tk.LEFT)
+        ctk.CTkLabel(
+            options_frame, text=t("default_path", "默认路径:", "Default Path:")
+        ).grid(row=3, column=0, padx=(25, 10), pady=10, sticky="w")
+
+        path_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
+        path_frame.grid(row=3, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
 
         self.default_path_var = tk.StringVar(
             value=Config.get_default_font_path() or t("not_set", "未设置", "Not Set")
         )
-        ttk.Label(
-            default_frame, textvariable=self.default_path_var, foreground="blue"
-        ).pack(side=tk.LEFT, padx=5)
+        ctk.CTkLabel(
+            path_frame, textvariable=self.default_path_var, text_color="#3B8ED0"
+        ).grid(row=0, column=0, padx=(0, 15), sticky="w")
 
-        ttk.Button(
-            default_frame,
+        ctk.CTkButton(
+            path_frame,
             text=t("set_path", "设置", "Set"),
+            width=80,
             command=self._set_default_font_path,
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
-            default_frame,
+        ).grid(row=0, column=1, padx=5)
+
+        ctk.CTkButton(
+            path_frame,
             text=t("browse_default", "从默认路径安装", "Install from Default"),
             command=self._install_fonts_default,
-        ).pack(side=tk.LEFT, padx=5)
+        ).grid(row=0, column=2, padx=5)
+
+        # Spacer
+        ctk.CTkLabel(options_frame, text="").grid(row=4, column=0, pady=5)
 
     def _create_launcher_tab(self):
         """Create game launcher options tab"""
-        tab = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(tab, text=t("launcher_tab", "启动选项", "Launch Options"))
+        tab = self.tab_launcher
+        tab.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -366,42 +419,56 @@ class GUIApplication:
             "获取游戏启动命令，用于在Steam中配置游戏以使用中文/日文环境。",
             "Get game launch commands to configure games in Steam for Chinese/Japanese environment.",
         )
-        ttk.Label(tab, text=desc_text, wraplength=600).pack(anchor=tk.W, pady=10)
-
-        # Launch command display
-        cmd_frame = ttk.LabelFrame(
-            tab, text=t("launch_cmd", "启动命令", "Launch Command"), padding="10"
+        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+            row=0, column=0, padx=20, pady=15, sticky="w"
         )
-        cmd_frame.pack(fill=tk.X, pady=10)
+
+        # Launch command frame
+        cmd_frame = ctk.CTkFrame(tab)
+        cmd_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        cmd_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            cmd_frame,
+            text=t("launch_cmd", "启动命令", "Launch Command"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
 
         self.launch_cmd_var = tk.StringVar()
-        cmd_entry = ttk.Entry(
+        cmd_entry = ctk.CTkEntry(
             cmd_frame,
             textvariable=self.launch_cmd_var,
             state="readonly",
-            font=("monospace", 10),
+            font=ctk.CTkFont(family="Consolas", size=12),
+            height=40,
         )
-        cmd_entry.pack(fill=tk.X, pady=5)
+        cmd_entry.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
 
-        btn_frame = ttk.Frame(cmd_frame)
-        btn_frame.pack(fill=tk.X)
+        btn_frame = ctk.CTkFrame(cmd_frame, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, padx=15, pady=(5, 15), sticky="w")
 
-        ttk.Button(
+        ctk.CTkButton(
             btn_frame,
             text=t("copy", "复制到剪贴板", "Copy to Clipboard"),
             command=self._copy_launch_cmd,
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
+        ).grid(row=0, column=0, padx=(0, 10))
+
+        ctk.CTkButton(
             btn_frame,
             text=t("refresh_cmd", "刷新", "Refresh"),
+            width=80,
             command=self._update_launch_cmd,
-        ).pack(side=tk.LEFT, padx=5)
+        ).grid(row=0, column=1)
 
-        # Instructions
-        instr_frame = ttk.LabelFrame(
-            tab, text=t("instructions", "使用说明", "Instructions"), padding="10"
-        )
-        instr_frame.pack(fill=tk.X, pady=10)
+        # Instructions frame
+        instr_frame = ctk.CTkFrame(tab)
+        instr_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
+        ctk.CTkLabel(
+            instr_frame,
+            text=t("instructions", "使用说明", "Instructions"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
 
         instructions = [
             t(
@@ -421,210 +488,88 @@ class GUIApplication:
                 "4. Close properties and launch game",
             ),
         ]
-        for instr in instructions:
-            ttk.Label(instr_frame, text=instr).pack(anchor=tk.W)
+        for i, instr in enumerate(instructions):
+            ctk.CTkLabel(instr_frame, text=instr).grid(
+                row=i + 1, column=0, padx=25, pady=3, sticky="w"
+            )
+
+        ctk.CTkLabel(instr_frame, text="").grid(
+            row=len(instructions) + 1, column=0, pady=5
+        )
 
         # Update command initially
-        self.root.after(300, self._update_launch_cmd)
+        self.after(300, self._update_launch_cmd)
 
-    def _create_steam_tab(self):
-        """Create Steam game management tab"""
-        tab = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(tab, text=t("steam_tab", "Steam游戏", "Steam Games"))
-
-        # Description
-        desc_text = t(
-            "steam_desc",
-            "管理由本程序添加到Steam库的游戏。",
-            "Manage games added to Steam library by this program.",
-        )
-        ttk.Label(tab, text=desc_text, wraplength=600).pack(anchor=tk.W, pady=10)
-
-        # Games list section
-        games_frame = ttk.LabelFrame(
-            tab,
-            text=t("managed_games", "已添加的游戏", "Managed Games"),
-            padding="10",
-        )
-        games_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-
-        # Games treeview with scrollbar
-        tree_frame = ttk.Frame(games_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
-
-        # Scrollbars
-        vsb = ttk.Scrollbar(tree_frame, orient="vertical")
-        vsb.pack(side=tk.RIGHT, fill=tk.Y)
-
-        hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
-        hsb.pack(side=tk.BOTTOM, fill=tk.X)
-
-        # Treeview for games
-        columns = ("name", "path", "language")
-        self.games_tree = ttk.Treeview(
-            tree_frame,
-            columns=columns,
-            show="headings",
-            yscrollcommand=vsb.set,
-            xscrollcommand=hsb.set,
-            height=8,
-        )
-
-        # Configure scrollbars
-        vsb.config(command=self.games_tree.yview)
-        hsb.config(command=self.games_tree.xview)
-
-        # Column headings
-        self.games_tree.heading("name", text=t("game_name", "游戏名称", "Game Name"))
-        self.games_tree.heading("path", text=t("game_path", "路径", "Path"))
-        self.games_tree.heading("language", text=t("language", "语言", "Language"))
-
-        # Column widths
-        self.games_tree.column("name", width=200, minwidth=150)
-        self.games_tree.column("path", width=300, minwidth=200)
-        self.games_tree.column("language", width=100, minwidth=80)
-
-        self.games_tree.pack(fill=tk.BOTH, expand=True)
-
-        # Game action buttons
-        game_btn_frame = ttk.Frame(games_frame)
-        game_btn_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(
-            game_btn_frame,
-            text=t("add_game", "添加游戏", "Add Game"),
-            command=self._browse_add_game,
-        ).pack(side=tk.LEFT, padx=5)
-
-        ttk.Button(
-            game_btn_frame,
-            text=t("launch_game", "启动游戏", "Launch Game"),
-            command=self._launch_selected_game,
-        ).pack(side=tk.LEFT, padx=5)
-
-        ttk.Button(
-            game_btn_frame,
-            text=t("remove_game", "移除游戏", "Remove Game"),
-            command=self._remove_selected_game,
-        ).pack(side=tk.LEFT, padx=5)
-
-        ttk.Button(
-            game_btn_frame,
-            text=t("refresh_games", "刷新列表", "Refresh"),
-            command=self._refresh_games_list,
-        ).pack(side=tk.LEFT, padx=5)
-
-        # Initial refresh
-        self.root.after(400, self._refresh_games_list)
-
-    def _create_log_area(self, parent):
+    def _create_log_area(self):
         """Create log output area"""
-        log_frame = ttk.LabelFrame(
-            parent, text=t("log", "操作日志", "Log"), padding="5"
-        )
-        log_frame.pack(fill=tk.BOTH, expand=True)
+        log_frame = ctk.CTkFrame(self)
+        log_frame.grid(row=3, column=0, padx=20, pady=(5, 15), sticky="ew")
+        log_frame.grid_columnconfigure(0, weight=1)
 
-        # Text widget with scrollbar
-        text_frame = ttk.Frame(log_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True)
+        ctk.CTkLabel(
+            log_frame,
+            text=t("log", "操作日志", "Log"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=0, padx=15, pady=(10, 5), sticky="w")
 
-        scrollbar = ttk.Scrollbar(text_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.log_text = tk.Text(
-            text_frame,
-            height=8,
-            yscrollcommand=scrollbar.set,
-            state="disabled",
-            wrap=tk.WORD,
-            font=("monospace", 9),
-        )
-        self.log_text.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.log_text.yview)
-
-        # Configure tags for colors
-        self.log_text.tag_configure("info", foreground="black")
-        self.log_text.tag_configure("success", foreground="green")
-        self.log_text.tag_configure("error", foreground="red")
-        self.log_text.tag_configure("warning", foreground="orange")
-
-    def _create_dialog(
-        self,
-        title: str,
-        width: int = 400,
-        height: int = 300,
-        min_width: int = 300,
-        min_height: int = 200,
-    ) -> tk.Toplevel:
-        """
-        Create a dialog window with proper sizing and centering.
-
-        Args:
-            title: Dialog title
-            width: Preferred width
-            height: Preferred height
-            min_width: Minimum width
-            min_height: Minimum height
-
-        Returns:
-            The created Toplevel dialog
-        """
-        dialog = tk.Toplevel(self.root)
-        dialog.title(title)
-        dialog.geometry(f"{width}x{height}")
-        dialog.minsize(min_width, min_height)
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        # Center dialog relative to main window
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - width) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - height) // 2
-        dialog.geometry(f"+{x}+{y}")
-
-        return dialog
+        self.log_text = ctk.CTkTextbox(log_frame, height=120, state="disabled")
+        self.log_text.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="ew")
 
     def _log(self, message: str, level: str = "info"):
         """Add message to log"""
-        self.log_text.config(state="normal")
-        self.log_text.insert(tk.END, message + "\n", level)
-        self.log_text.see(tk.END)
-        self.log_text.config(state="disabled")
-        self.root.update_idletasks()
+        self.log_text.configure(state="normal")
+
+        # Add color prefix based on level
+        prefix = ""
+        if level == "success":
+            prefix = "[OK] "
+        elif level == "error":
+            prefix = "[ERROR] "
+        elif level == "warning":
+            prefix = "[WARN] "
+
+        self.log_text.insert("end", prefix + message + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+        self.update_idletasks()
 
     def _show_language_dialog(self):
         """Show language selection dialog"""
-        dialog = self._create_dialog(
-            title=t("select_lang", "选择目标语言", "Select Target Language"),
-            width=350,
-            height=200,
-            min_width=300,
-            min_height=180,
-        )
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(t("select_lang", "选择目标语言", "Select Target Language"))
+        dialog.geometry("380x220")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
 
-        frame = ttk.Frame(dialog, padding="20")
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 380) // 2
+        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        dialog.geometry(f"+{x}+{y}")
 
-        ttk.Label(
-            frame,
+        # Content
+        ctk.CTkLabel(
+            dialog,
             text=t("choose_lang", "请选择目标语言:", "Choose target language:"),
-            style="Header.TLabel",
-        ).pack(pady=(0, 15))
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(pady=(25, 15))
 
         lang_var = tk.StringVar(value=self.target_language or TargetLanguage.CHINESE)
 
-        ttk.Radiobutton(
-            frame,
+        ctk.CTkRadioButton(
+            dialog,
             text="简体中文 (Simplified Chinese)",
             variable=lang_var,
             value=TargetLanguage.CHINESE,
-        ).pack(anchor=tk.W, pady=2)
-        ttk.Radiobutton(
-            frame,
+        ).pack(anchor="w", padx=40, pady=5)
+
+        ctk.CTkRadioButton(
+            dialog,
             text="日本語 (Japanese)",
             variable=lang_var,
             value=TargetLanguage.JAPANESE,
-        ).pack(anchor=tk.W, pady=2)
+        ).pack(anchor="w", padx=40, pady=5)
 
         def on_confirm():
             self.target_language = lang_var.get()
@@ -641,15 +586,15 @@ class GUIApplication:
                 "success",
             )
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=(20, 0))
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(pady=20)
 
-        ttk.Button(
+        ctk.CTkButton(
             btn_frame, text=t("confirm", "确认", "Confirm"), command=on_confirm
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side="left", padx=10)
 
     def _install_locale(self):
         """Install locale"""
@@ -694,9 +639,9 @@ class GUIApplication:
         def task():
             try:
                 success, msg = setup_locale(locale_code)
-                self.root.after(0, lambda: self._on_task_complete(success, msg))
+                self.after(0, lambda: self._on_task_complete(success, msg))
             except Exception as e:
-                self.root.after(0, lambda: self._on_task_complete(False, str(e)))
+                self.after(0, lambda: self._on_task_complete(False, str(e)))
 
         threading.Thread(target=task, daemon=True).start()
 
@@ -725,7 +670,7 @@ class GUIApplication:
             try:
                 success, assets = list_available_fonts()
                 if not success or not assets:
-                    self.root.after(
+                    self.after(
                         0,
                         lambda: self._log(
                             t(
@@ -738,121 +683,113 @@ class GUIApplication:
                     )
                     return
 
-                self.root.after(0, lambda: self._show_font_selection(assets))
+                self.after(0, lambda: self._show_font_selection(assets))
             except Exception as e:
-                self.root.after(0, lambda: self._log(f"Error: {str(e)}", "error"))
+                self.after(0, lambda: self._log(f"Error: {str(e)}", "error"))
 
         threading.Thread(target=fetch_and_show, daemon=True).start()
 
     def _show_font_selection(self, assets):
         """Show font selection dialog"""
-        dialog = tk.Toplevel(self.root)
+        dialog = ctk.CTkToplevel(self)
         dialog.title(t("select_font", "选择字体包", "Select Font Package"))
-        dialog.geometry("500x300")
-        dialog.transient(self.root)
+        dialog.geometry("500x350")
+        dialog.transient(self)
         dialog.grab_set()
 
-        frame = ttk.Frame(dialog, padding="10")
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 500) // 2
+        y = self.winfo_y() + (self.winfo_height() - 350) // 2
+        dialog.geometry(f"+{x}+{y}")
 
-        ttk.Label(
-            frame,
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            dialog,
             text=t("available_fonts", "可用字体包:", "Available font packages:"),
-            style="Header.TLabel",
-        ).pack(anchor=tk.W, pady=5)
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
-        # Listbox with fonts
-        list_frame = ttk.Frame(frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
+        # Scrollable frame for font list
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.grid(row=1, column=0, padx=20, pady=5, sticky="nsew")
 
-        scrollbar = ttk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set)
-        listbox.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=listbox.yview)
-
-        for asset in assets:
+        self.font_radio_var = tk.StringVar(value="0")
+        for i, asset in enumerate(assets):
             size_mb = asset.size / (1024 * 1024)
-            listbox.insert(tk.END, f"{asset.name} ({size_mb:.2f} MB)")
-
-        if assets:
-            listbox.selection_set(0)
+            ctk.CTkRadioButton(
+                scroll_frame,
+                text=f"{asset.name} ({size_mb:.2f} MB)",
+                variable=self.font_radio_var,
+                value=str(i),
+            ).pack(anchor="w", pady=5)
 
         def on_install():
-            selection = listbox.curselection()
-            if not selection:
-                messagebox.showwarning(
-                    t("warning", "警告", "Warning"),
-                    t(
-                        "select_font_pkg",
-                        "请选择一个字体包",
-                        "Please select a font package",
-                    ),
-                )
-                return
-
-            asset = assets[selection[0]]
+            idx = int(self.font_radio_var.get())
+            asset = assets[idx]
             dialog.destroy()
             self._download_and_install_font(asset)
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=10)
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, pady=15)
 
-        ttk.Button(
+        ctk.CTkButton(
             btn_frame, text=t("install", "安装", "Install"), command=on_install
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side="left", padx=10)
 
     def _download_and_install_font(self, asset):
         """Download font with progress dialog, then confirm before installing"""
-        # Create download progress dialog
-        dialog = self._create_dialog(
-            title=t("downloading", "下载中", "Downloading"),
-            width=450,
-            height=200,
-            min_width=400,
-            min_height=180,
-        )
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(t("downloading", "下载中", "Downloading"))
+        dialog.geometry("480x220")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 480) // 2
+        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        dialog.geometry(f"+{x}+{y}")
 
         # Prevent closing during download
         dialog.protocol("WM_DELETE_WINDOW", lambda: None)
 
-        frame = ttk.Frame(dialog, padding="20")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        # File name label
-        ttk.Label(
-            frame,
+        # Content
+        ctk.CTkLabel(
+            dialog,
             text=t("downloading_file", "正在下载文件:", "Downloading file:"),
-            style="Header.TLabel",
-        ).pack(anchor=tk.W)
-        ttk.Label(frame, text=asset.name, foreground="blue").pack(
-            anchor=tk.W, pady=(0, 10)
+            font=ctk.CTkFont(weight="bold"),
+        ).pack(anchor="w", padx=25, pady=(20, 5))
+        ctk.CTkLabel(dialog, text=asset.name, text_color="#3B8ED0").pack(
+            anchor="w", padx=25, pady=(0, 15)
         )
 
         # Progress bar
-        progress_var = tk.DoubleVar(value=0)
-        progress_bar = ttk.Progressbar(
-            frame, variable=progress_var, maximum=100, length=380, mode="determinate"
-        )
-        progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_bar = ctk.CTkProgressBar(dialog, width=430)
+        self.progress_bar.pack(padx=25, pady=5)
+        self.progress_bar.set(0)
 
         # Progress text
-        progress_text_var = tk.StringVar(value="0%  0.00 / 0.00 MB")
-        progress_label = ttk.Label(frame, textvariable=progress_text_var)
-        progress_label.pack(anchor=tk.W)
+        self.progress_label = ctk.CTkLabel(dialog, text="0%  0.00 / 0.00 MB")
+        self.progress_label.pack(anchor="w", padx=25, pady=5)
 
         # Status label
-        status_var = tk.StringVar(value=t("connecting", "正在连接...", "Connecting..."))
-        status_label = ttk.Label(frame, textvariable=status_var, foreground="gray")
-        status_label.pack(anchor=tk.W, pady=(5, 0))
+        self.status_label = ctk.CTkLabel(
+            dialog,
+            text=t("connecting", "正在连接...", "Connecting..."),
+            text_color="gray",
+        )
+        self.status_label.pack(anchor="w", padx=25, pady=5)
 
-        # Cancel button (initially hidden, will be replaced by result buttons)
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=tk.X, pady=10, padx=15)
+        # Button frame
+        self.dl_btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        self.dl_btn_frame.pack(pady=10)
 
         # Track download state
         download_state = {
@@ -864,28 +801,32 @@ class GUIApplication:
 
         def on_cancel():
             download_state["cancelled"] = True
-            status_var.set(t("cancelling", "正在取消...", "Cancelling..."))
+            self.status_label.configure(
+                text=t("cancelling", "正在取消...", "Cancelling...")
+            )
 
-        cancel_btn = ttk.Button(
-            btn_frame, text=t("cancel", "取消", "Cancel"), command=on_cancel
+        self.cancel_btn = ctk.CTkButton(
+            self.dl_btn_frame, text=t("cancel", "取消", "Cancel"), command=on_cancel
         )
-        cancel_btn.pack(side=tk.LEFT, padx=5)
+        self.cancel_btn.pack()
 
         def update_progress(downloaded: int, total: int):
             """Update progress bar from download callback"""
             if total > 0:
-                percent = (downloaded / total) * 100
+                percent = downloaded / total
                 mb_downloaded = downloaded / (1024 * 1024)
                 mb_total = total / (1024 * 1024)
 
                 def do_update():
-                    progress_var.set(percent)
-                    progress_text_var.set(
-                        f"{percent:.1f}%  {mb_downloaded:.2f} / {mb_total:.2f} MB"
+                    self.progress_bar.set(percent)
+                    self.progress_label.configure(
+                        text=f"{percent * 100:.1f}%  {mb_downloaded:.2f} / {mb_total:.2f} MB"
                     )
-                    status_var.set(t("downloading", "下载中...", "Downloading..."))
+                    self.status_label.configure(
+                        text=t("downloading", "下载中...", "Downloading...")
+                    )
 
-                self.root.after(0, do_update)
+                self.after(0, do_update)
 
         def download_task():
             """Background download task"""
@@ -893,21 +834,18 @@ class GUIApplication:
 
             try:
                 downloader = FontReleaseDownloader()
-
-                # Custom download with progress callback
                 success, msg, zip_path = downloader.download_font(
                     asset, update_progress
                 )
 
                 if download_state["cancelled"]:
-                    # Clean up downloaded file if cancelled
                     if zip_path and os.path.exists(zip_path):
                         try:
                             os.remove(zip_path)
                         except:
                             pass
-                    self.root.after(0, lambda: dialog.destroy())
-                    self.root.after(
+                    self.after(0, dialog.destroy)
+                    self.after(
                         0,
                         lambda: self._log(
                             t("download_cancelled", "下载已取消", "Download cancelled"),
@@ -920,35 +858,34 @@ class GUIApplication:
                 download_state["zip_path"] = zip_path
                 download_state["error_msg"] = msg
 
-                # Update UI on main thread
-                self.root.after(0, lambda: on_download_complete())
+                self.after(0, on_download_complete)
 
             except Exception as e:
                 download_state["success"] = False
                 download_state["error_msg"] = str(e)
-                self.root.after(0, lambda: on_download_complete())
+                self.after(0, on_download_complete)
 
         def on_download_complete():
-            """Handle download completion - show result and install button"""
-            # Clear cancel button
-            for widget in btn_frame.winfo_children():
+            """Handle download completion"""
+            # Clear buttons
+            for widget in self.dl_btn_frame.winfo_children():
                 widget.destroy()
 
-            # Allow closing dialog now
             dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
             if download_state["success"] and download_state["zip_path"]:
-                # Download successful - show install confirmation
-                progress_var.set(100)
-                progress_text_var.set("100%  " + t("complete", "完成", "Complete"))
-                status_var.set(
-                    t(
+                self.progress_bar.set(1)
+                self.progress_label.configure(
+                    text="100%  " + t("complete", "完成", "Complete")
+                )
+                self.status_label.configure(
+                    text=t(
                         "download_success",
                         "下载成功！点击安装按钮开始安装字体。",
-                        "Download successful! Click Install to begin font installation.",
-                    )
+                        "Download successful! Click Install to begin.",
+                    ),
+                    text_color="#2FA572",
                 )
-                status_label.config(foreground="green")
 
                 self._log(
                     t(
@@ -960,32 +897,33 @@ class GUIApplication:
                 )
 
                 def on_install():
-                    """Start font installation"""
                     dialog.destroy()
                     self._install_downloaded_font(
                         download_state["zip_path"], asset.name
                     )
 
                 def on_close():
-                    """Close without installing"""
                     dialog.destroy()
                     self._log(
                         t("install_skipped", "已跳过安装", "Installation skipped"),
                         "warning",
                     )
 
-                # Show install and close buttons
-                ttk.Button(
-                    btn_frame, text=t("install", "安装", "Install"), command=on_install
-                ).pack(side=tk.LEFT, padx=5)
-                ttk.Button(
-                    btn_frame, text=t("close", "关闭", "Close"), command=on_close
-                ).pack(side=tk.LEFT, padx=5)
+                ctk.CTkButton(
+                    self.dl_btn_frame,
+                    text=t("install", "安装", "Install"),
+                    command=on_install,
+                ).pack(side="left", padx=10)
+                ctk.CTkButton(
+                    self.dl_btn_frame,
+                    text=t("close", "关闭", "Close"),
+                    command=on_close,
+                ).pack(side="left", padx=10)
             else:
-                # Download failed - show error
-                progress_bar.config(style="")  # Reset style
-                status_var.set(t("download_failed", "下载失败", "Download failed"))
-                status_label.config(foreground="red")
+                self.status_label.configure(
+                    text=t("download_failed", "下载失败", "Download failed"),
+                    text_color="#E74C3C",
+                )
 
                 error_msg = download_state["error_msg"] or t(
                     "unknown_error", "未知错误", "Unknown error"
@@ -999,12 +937,12 @@ class GUIApplication:
                     "error",
                 )
 
-                # Show only close button
-                ttk.Button(
-                    btn_frame, text=t("close", "关闭", "Close"), command=dialog.destroy
-                ).pack(side=tk.LEFT, padx=5)
+                ctk.CTkButton(
+                    self.dl_btn_frame,
+                    text=t("close", "关闭", "Close"),
+                    command=dialog.destroy,
+                ).pack()
 
-        # Start download in background thread
         self._log(
             t(
                 "starting_download",
@@ -1029,9 +967,9 @@ class GUIApplication:
         def task():
             try:
                 success, msg = setup_fonts(zip_path)
-                self.root.after(0, lambda: self._on_task_complete(success, msg))
+                self.after(0, lambda: self._on_task_complete(success, msg))
             except Exception as e:
-                self.root.after(0, lambda: self._on_task_complete(False, str(e)))
+                self.after(0, lambda: self._on_task_complete(False, str(e)))
 
         threading.Thread(target=task, daemon=True).start()
 
@@ -1057,9 +995,9 @@ class GUIApplication:
         def task():
             try:
                 success, msg = setup_fonts(file_path)
-                self.root.after(0, lambda: self._on_task_complete(success, msg))
+                self.after(0, lambda: self._on_task_complete(success, msg))
             except Exception as e:
-                self.root.after(0, lambda: self._on_task_complete(False, str(e)))
+                self.after(0, lambda: self._on_task_complete(False, str(e)))
 
         threading.Thread(target=task, daemon=True).start()
 
@@ -1122,39 +1060,38 @@ class GUIApplication:
             return
 
         # Show selection dialog
-        dialog = tk.Toplevel(self.root)
+        dialog = ctk.CTkToplevel(self)
         dialog.title(t("select_font", "选择字体包", "Select Font Package"))
-        dialog.geometry("400x250")
-        dialog.transient(self.root)
+        dialog.geometry("450x300")
+        dialog.transient(self)
         dialog.grab_set()
 
-        frame = ttk.Frame(dialog, padding="10")
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Center
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 450) // 2
+        y = self.winfo_y() + (self.winfo_height() - 300) // 2
+        dialog.geometry(f"+{x}+{y}")
 
-        list_frame = ttk.Frame(frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(0, weight=1)
 
-        scrollbar = ttk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set)
-        listbox.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=listbox.yview)
-
-        for f in zip_files:
+        file_var = tk.StringVar(value="0")
+        for i, f in enumerate(zip_files):
             file_path = os.path.join(default_path, f)
             size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            listbox.insert(tk.END, f"{f} ({size_mb:.2f} MB)")
-
-        if zip_files:
-            listbox.selection_set(0)
+            ctk.CTkRadioButton(
+                scroll_frame,
+                text=f"{f} ({size_mb:.2f} MB)",
+                variable=file_var,
+                value=str(i),
+            ).pack(anchor="w", pady=5)
 
         def on_install():
-            selection = listbox.curselection()
-            if not selection:
-                return
-
-            file_name = zip_files[selection[0]]
+            idx = int(file_var.get())
+            file_name = zip_files[idx]
             file_path = os.path.join(default_path, file_name)
             dialog.destroy()
 
@@ -1170,21 +1107,21 @@ class GUIApplication:
             def task():
                 try:
                     success, msg = setup_fonts(file_path)
-                    self.root.after(0, lambda: self._on_task_complete(success, msg))
+                    self.after(0, lambda: self._on_task_complete(success, msg))
                 except Exception as e:
-                    self.root.after(0, lambda: self._on_task_complete(False, str(e)))
+                    self.after(0, lambda: self._on_task_complete(False, str(e)))
 
             threading.Thread(target=task, daemon=True).start()
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=10)
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.grid(row=1, column=0, pady=10)
 
-        ttk.Button(
+        ctk.CTkButton(
             btn_frame, text=t("install", "安装", "Install"), command=on_install
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side="left", padx=10)
 
     def _update_launch_cmd(self):
         """Update launch command display"""
@@ -1204,38 +1141,34 @@ class GUIApplication:
         """Copy launch command to clipboard"""
         cmd = self.launch_cmd_var.get()
         if cmd and not cmd.startswith(t("select_lang_first", "请先", "Please")):
-            self.root.clipboard_clear()
-            self.root.clipboard_append(cmd)
+            self.clipboard_clear()
+            self.clipboard_append(cmd)
             self._log(t("copied", "已复制到剪贴板", "Copied to clipboard"), "success")
 
     def _refresh_games_list(self):
         """Refresh managed games list"""
         # Clear existing items
-        for item in self.games_tree.get_children():
-            self.games_tree.delete(item)
+        for widget in self.games_scroll.winfo_children():
+            if widget.grid_info().get("row", 0) > 0:  # Keep header
+                widget.destroy()
 
         # Get managed games from config
         managed_games = Config.get_managed_games()
 
         if not managed_games:
-            # Insert placeholder message
-            self.games_tree.insert(
-                "",
-                tk.END,
-                values=(
-                    t("no_games", "暂无游戏", "No games yet"),
-                    t(
-                        "use_add_button",
-                        "使用下方按钮添加游戏",
-                        "Use button below to add games",
-                    ),
-                    "",
+            ctk.CTkLabel(
+                self.games_scroll,
+                text=t(
+                    "no_games",
+                    "暂无游戏，使用下方按钮添加",
+                    "No games yet, use button below to add",
                 ),
-            )
+                text_color="gray",
+            ).grid(row=1, column=0, columnspan=3, padx=5, pady=20)
             return
 
         # Populate with game data
-        for game in managed_games:
+        for i, game in enumerate(managed_games):
             game_name = game.get("name", "Unknown")
             game_path = game.get("exe_path", "")
             game_lang = game.get("language", "")
@@ -1248,79 +1181,50 @@ class GUIApplication:
             else:
                 lang_display = game_lang
 
-            self.games_tree.insert(
-                "", tk.END, values=(game_name, game_path, lang_display)
+            row = i + 1
+            ctk.CTkLabel(self.games_scroll, text=game_name).grid(
+                row=row, column=0, padx=5, pady=3, sticky="w"
+            )
+            ctk.CTkLabel(
+                self.games_scroll, text=game_path, text_color="gray", wraplength=250
+            ).grid(row=row, column=1, padx=5, pady=3, sticky="w")
+            ctk.CTkLabel(self.games_scroll, text=lang_display).grid(
+                row=row, column=2, padx=5, pady=3, sticky="w"
             )
 
-    def _launch_selected_game(self):
-        """Launch the selected game"""
-        selection = self.games_tree.selection()
-        if not selection:
-            messagebox.showwarning(
-                t("warning", "警告", "Warning"),
-                t(
-                    "select_game_first",
-                    "请先选择一个游戏",
-                    "Please select a game first",
-                ),
-            )
-            return
+            # Delete button
+            ctk.CTkButton(
+                self.games_scroll,
+                text="×",
+                width=30,
+                height=25,
+                fg_color="#E74C3C",
+                hover_color="#C0392B",
+                command=lambda n=game_name: self._remove_game(n),
+            ).grid(row=row, column=3, padx=5, pady=3)
 
-        # Get selected game info
-        item = self.games_tree.item(selection[0])
-        game_name = item["values"][0]
-
-        # Placeholder: Show not implemented message
-        messagebox.showinfo(
-            t("info", "提示", "Info"),
-            t(
-                "feature_coming_soon",
-                f"启动游戏功能即将推出\n游戏: {game_name}",
-                f"Launch game feature coming soon\nGame: {game_name}",
-            ),
-        )
-
-    def _remove_selected_game(self):
-        """Remove the selected game from managed list"""
-        selection = self.games_tree.selection()
-        if not selection:
-            messagebox.showwarning(
-                t("warning", "警告", "Warning"),
-                t(
-                    "select_game_first",
-                    "请先选择一个游戏",
-                    "Please select a game first",
-                ),
-            )
-            return
-
-        # Get selected game info
-        item = self.games_tree.item(selection[0])
-        game_name = item["values"][0]
-
-        # Confirm removal
+    def _remove_game(self, game_name: str):
+        """Remove a game from the list"""
         if not messagebox.askyesno(
             t("confirm", "确认", "Confirm"),
             t(
                 "confirm_remove_game",
-                f"确认从列表中移除游戏?\n{game_name}\n\n注意:这只会从本程序的管理列表中移除,不会从Steam库中删除。",
-                f"Remove game from managed list?\n{game_name}\n\nNote: This only removes from this program's list, not from Steam library.",
+                f"确认从列表中移除游戏?\n{game_name}",
+                f"Remove game from list?\n{game_name}",
             ),
         ):
             return
 
-        # Remove from config
         managed_games = Config.get_managed_games()
         managed_games = [g for g in managed_games if g.get("name") != game_name]
         Config.set_managed_games(managed_games)
 
-        # Refresh display
         self._refresh_games_list()
         self._log(
             t(
                 "game_removed",
                 f"游戏已从列表移除: {game_name}",
-                f"Game removed from list: {game_name}",
+                f"Game removed: {game_name}",
             ),
             "success",
         )
@@ -1354,46 +1258,54 @@ class GUIApplication:
         # Get game name
         default_name = os.path.splitext(os.path.basename(file_path))[0]
 
-        # Show name input dialog with scrollable frame for long content
-        dialog = self._create_dialog(
-            title=t("add_game", "添加游戏", "Add Game"),
-            width=450,
-            height=320,
-            min_width=400,
-            min_height=280,
+        # Show input dialog
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(t("add_game", "添加游戏", "Add Game"))
+        dialog.geometry("500x350")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Center
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 500) // 2
+        y = self.winfo_y() + (self.winfo_height() - 350) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        dialog.grid_columnconfigure(0, weight=1)
+
+        # Executable path
+        ctk.CTkLabel(
+            dialog,
+            text=t("game_exe", "可执行文件:", "Executable:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=0, column=0, padx=25, pady=(25, 5), sticky="w")
+        ctk.CTkLabel(dialog, text=file_path, text_color="#3B8ED0", wraplength=450).grid(
+            row=1, column=0, padx=25, pady=(0, 10), sticky="w"
         )
 
-        # Use ScrollableFrame for content that may overflow
-        scroll_container = ScrollableFrame(dialog)
-        scroll_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Game name
+        ctk.CTkLabel(
+            dialog,
+            text=t("game_name", "游戏名称:", "Game Name:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=2, column=0, padx=25, pady=(10, 5), sticky="w")
+        name_entry = ctk.CTkEntry(dialog, width=450)
+        name_entry.insert(0, default_name)
+        name_entry.grid(row=3, column=0, padx=25, pady=(0, 10), sticky="w")
 
-        frame = ttk.Frame(scroll_container.scrollable_frame, padding="15")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text=t("game_exe", "可执行文件:", "Executable:")).pack(
-            anchor=tk.W
-        )
-        ttk.Label(frame, text=file_path, foreground="blue", wraplength=380).pack(
-            anchor=tk.W, pady=5
-        )
-
-        ttk.Label(frame, text=t("game_name", "游戏名称:", "Game Name:")).pack(
-            anchor=tk.W, pady=(10, 0)
-        )
-        name_var = tk.StringVar(value=default_name)
-        name_entry = ttk.Entry(frame, textvariable=name_var, width=45)
-        name_entry.pack(fill=tk.X, pady=5)
-
+        # Launch options
         launch_options = get_locale_command(self.target_language)
-        ttk.Label(frame, text=t("launch_opts", "启动选项:", "Launch Options:")).pack(
-            anchor=tk.W, pady=(10, 0)
-        )
-        ttk.Label(frame, text=launch_options, foreground="green", wraplength=380).pack(
-            anchor=tk.W
-        )
+        ctk.CTkLabel(
+            dialog,
+            text=t("launch_opts", "启动选项:", "Launch Options:"),
+            font=ctk.CTkFont(weight="bold"),
+        ).grid(row=4, column=0, padx=25, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(
+            dialog, text=launch_options, text_color="#2FA572", wraplength=450
+        ).grid(row=5, column=0, padx=25, pady=(0, 20), sticky="w")
 
         def on_add():
-            game_name = name_var.get().strip()
+            game_name = name_entry.get().strip()
             if not game_name:
                 messagebox.showwarning(
                     t("warning", "警告", "Warning"),
@@ -1420,7 +1332,6 @@ class GUIApplication:
                         launch_options=launch_options,
                     )
 
-                    # If successful, save to managed games list
                     if success:
                         game_data = {
                             "name": game_name,
@@ -1429,36 +1340,30 @@ class GUIApplication:
                             "launch_options": launch_options,
                         }
                         Config.add_managed_game(game_data)
-                        # Refresh games list on main thread
-                        self.root.after(0, self._refresh_games_list)
+                        self.after(0, self._refresh_games_list)
 
-                    self.root.after(0, lambda: self._on_task_complete(success, msg))
+                    self.after(0, lambda: self._on_task_complete(success, msg))
                 except Exception as e:
-                    self.root.after(0, lambda: self._on_task_complete(False, str(e)))
+                    self.after(0, lambda: self._on_task_complete(False, str(e)))
 
             threading.Thread(target=task, daemon=True).start()
 
-        # Button frame outside scrollable area to ensure visibility
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=tk.X, pady=10, padx=15)
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.grid(row=6, column=0, pady=15)
 
-        ttk.Button(btn_frame, text=t("add", "添加", "Add"), command=on_add).pack(
-            side=tk.LEFT, padx=5
+        ctk.CTkButton(btn_frame, text=t("add", "添加", "Add"), command=on_add).pack(
+            side="left", padx=10
         )
-        ttk.Button(
+        ctk.CTkButton(
             btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
-        ).pack(side=tk.LEFT, padx=5)
-
-    def run(self):
-        """Run the application"""
-        self.root.mainloop()
+        ).pack(side="left", padx=10)
 
 
 def main():
     """Main function"""
     app = GUIApplication()
     try:
-        app.run()
+        app.mainloop()
     except KeyboardInterrupt:
         pass
     except Exception as e:
