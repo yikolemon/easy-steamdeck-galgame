@@ -503,9 +503,25 @@ class GUIApplication(ctk.CTk):
             row=0, column=0, padx=20, pady=15, sticky="w"
         )
 
+        # Button frame - placed above steps for better visibility
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.grid(row=1, column=0, padx=20, pady=(10, 5), sticky="ew")
+        btn_frame.grid_columnconfigure(0, weight=1)
+
+        # Install button - centered
+        self.locale_install_btn = ctk.CTkButton(
+            btn_frame,
+            text=t("install_locale", "安装语言环境", "Install Locale"),
+            font=ctk.CTkFont(size=14),
+            height=45,
+            width=200,
+            command=self._install_locale,
+        )
+        self.locale_install_btn.grid(row=0, column=0, pady=10)
+
         # Steps frame
         steps_frame = ctk.CTkFrame(scroll)
-        steps_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        steps_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
         steps_frame.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -528,22 +544,6 @@ class GUIApplication(ctk.CTk):
 
         # Spacer
         ctk.CTkLabel(steps_frame, text="").grid(row=len(steps) + 1, column=0, pady=5)
-
-        # Button frame for better visibility
-        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        btn_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
-        btn_frame.grid_columnconfigure(0, weight=1)
-
-        # Install button - centered
-        self.locale_install_btn = ctk.CTkButton(
-            btn_frame,
-            text=t("install_locale", "安装语言环境", "Install Locale"),
-            font=ctk.CTkFont(size=14),
-            height=45,
-            width=200,
-            command=self._install_locale,
-        )
-        self.locale_install_btn.grid(row=0, column=0, pady=10)
 
     def _create_font_tab(self):
         """Create font installation tab"""
