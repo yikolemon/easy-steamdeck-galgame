@@ -22,6 +22,9 @@ datas = []
 # Collect requests data files
 datas += collect_data_files('requests')
 
+# Collect customtkinter data files (themes, assets, etc.)
+datas += collect_data_files('customtkinter')
+
 a = Analysis(
     ['run.py'],
     pathex=[],
@@ -37,6 +40,7 @@ a = Analysis(
         'src.utils',
         'src.config',
         'requests',
+        'customtkinter',
         'tkinter',
         'tkinter.ttk',
         'tkinter.messagebox',
