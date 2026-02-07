@@ -21,12 +21,7 @@ from src.core.installers import (
 from src.utils.locale import t, is_chinese
 from src.core.game_launcher import get_locale_command
 from src.config import Config, TargetLanguage
-from src.core.steam_manager import (
-    SteamManager,
-    get_game_search_paths,
-    add_game_search_path,
-    remove_game_search_path,
-)
+from src.core.steam_manager import SteamManager
 
 
 class ScrollableFrame(ttk.Frame):
@@ -519,45 +514,8 @@ class GUIApplication:
             command=self._refresh_games_list,
         ).pack(side=tk.LEFT, padx=5)
 
-        # Search paths section (collapsed)
-        paths_frame = ttk.LabelFrame(
-            tab,
-            text=t("search_paths", "游戏搜索路径", "Game Search Paths"),
-            padding="10",
-        )
-        paths_frame.pack(fill=tk.X, pady=5)
-
-        # Path listbox with scrollbar
-        list_frame = ttk.Frame(paths_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
-
-        scrollbar = ttk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.paths_listbox = tk.Listbox(
-            list_frame, yscrollcommand=scrollbar.set, height=4
-        )
-        self.paths_listbox.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.paths_listbox.yview)
-
-        # Path buttons
-        path_btn_frame = ttk.Frame(paths_frame)
-        path_btn_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(
-            path_btn_frame,
-            text=t("add_path", "添加路径", "Add Path"),
-            command=self._add_search_path,
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Button(
-            path_btn_frame,
-            text=t("remove_path", "删除路径", "Remove Path"),
-            command=self._remove_search_path,
-        ).pack(side=tk.LEFT, padx=5)
-
         # Initial refresh
         self.root.after(400, self._refresh_games_list)
-        self.root.after(400, self._refresh_paths)
 
     def _create_log_area(self, parent):
         """Create log output area"""
@@ -1249,49 +1207,6 @@ class GUIApplication:
             self.root.clipboard_clear()
             self.root.clipboard_append(cmd)
             self._log(t("copied", "已复制到剪贴板", "Copied to clipboard"), "success")
-
-    def _refresh_paths(self):
-        """Refresh search paths list"""
-        self.paths_listbox.delete(0, tk.END)
-        paths = get_game_search_paths()
-        for path in paths:
-            self.paths_listbox.insert(tk.END, path)
-
-    def _add_search_path(self):
-        """Add new search path"""
-        path = filedialog.askdirectory(
-            title=t("select_game_dir", "选择游戏目录", "Select Game Directory")
-        )
-
-        if path:
-            success, msg = add_game_search_path(path)
-            if success:
-                self._log(msg, "success")
-                self._refresh_paths()
-            else:
-                self._log(msg, "error")
-
-    def _remove_search_path(self):
-        """Remove selected search path"""
-        selection = self.paths_listbox.curselection()
-        if not selection:
-            messagebox.showwarning(
-                t("warning", "警告", "Warning"),
-                t(
-                    "select_path_first",
-                    "请先选择一个路径",
-                    "Please select a path first",
-                ),
-            )
-            return
-
-        path = self.paths_listbox.get(selection[0])
-        success, msg = remove_game_search_path(path)
-        if success:
-            self._log(msg, "success")
-            self._refresh_paths()
-        else:
-            self._log(msg, "error")
 
     def _refresh_games_list(self):
         """Refresh managed games list"""
