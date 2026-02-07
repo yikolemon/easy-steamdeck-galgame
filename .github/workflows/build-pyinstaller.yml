@@ -62,20 +62,26 @@ jobs:
       
       - name: Create release package (${{ matrix.build-type }})
         run: |
-          # Create package directory
+          # Define names
           PACKAGE_NAME="steamdeck-galgame-${{ matrix.build-type }}"
-          PACKAGE_DIR="dist/${PACKAGE_NAME}"
+          EXECUTABLE="dist/${PACKAGE_NAME}"
+          PACKAGE_DIR="dist/${PACKAGE_NAME}-pkg"
+          
+          # First rename executable to temp location
+          mv "${EXECUTABLE}" "dist/steamdeck-galgame-temp"
+          
+          # Create package directory
           mkdir -p "${PACKAGE_DIR}"
           
-          # Move executable into package directory
-          mv "dist/steamdeck-galgame-${{ matrix.build-type }}" "${PACKAGE_DIR}/steamdeck-galgame"
+          # Move executable into package directory with final name
+          mv "dist/steamdeck-galgame-temp" "${PACKAGE_DIR}/steamdeck-galgame"
           
           # Copy installation scripts and desktop file
           cp install_desktop.sh "${PACKAGE_DIR}/"
           cp steamdeck-galgame.desktop "${PACKAGE_DIR}/"
           
           # Create README for the package
-          cat > "${PACKAGE_DIR}/README.txt" << 'EOF'
+          cat > "${PACKAGE_DIR}/README.txt" << 'READMEEOF'
           SteamDeck Galgame - 中文游戏环境配置工具
           ==========================================
           
@@ -95,20 +101,23 @@ jobs:
           
           文件说明:
           ---------
-          - steamdeck-galgame      : 主程序
-          - install_desktop.sh    : 桌面快捷方式安装脚本
+          - steamdeck-galgame       : 主程序
+          - install_desktop.sh      : 桌面快捷方式安装脚本
           - steamdeck-galgame.desktop : 桌面快捷方式模板
           
           更多信息请访问: https://github.com/yikolemon/steamdeck-galgame
-          EOF
+          READMEEOF
           
           # Make scripts executable
           chmod +x "${PACKAGE_DIR}/steamdeck-galgame"
           chmod +x "${PACKAGE_DIR}/install_desktop.sh"
           
+          # Rename package directory to final name
+          mv "${PACKAGE_DIR}" "dist/${PACKAGE_NAME}"
+          
           # List package contents
           echo "Package contents:"
-          ls -lh "${PACKAGE_DIR}/"
+          ls -lh "dist/${PACKAGE_NAME}/"
           
       - name: Create tarball (${{ matrix.build-type }})
         run: |
@@ -140,7 +149,6 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          # Copy tar.gz files for release
           find all-artifacts -name "*.tar.gz" -exec cp {} release-assets/ \;
           ls -lh release-assets/
           
