@@ -433,6 +433,8 @@ class GUIApplication(ctk.CTk):
         """Create locale installation tab"""
         tab = self.tab_locale
         tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=0)  # Steps frame doesn't expand
+        tab.grid_rowconfigure(2, weight=0)  # Button row doesn't expand
 
         # Description
         desc_text = t(
@@ -447,6 +449,7 @@ class GUIApplication(ctk.CTk):
         # Steps frame
         steps_frame = ctk.CTkFrame(tab)
         steps_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        steps_frame.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             steps_frame,
@@ -469,15 +472,21 @@ class GUIApplication(ctk.CTk):
         # Spacer
         ctk.CTkLabel(steps_frame, text="").grid(row=len(steps) + 1, column=0, pady=5)
 
-        # Install button
-        install_btn = ctk.CTkButton(
-            tab,
+        # Button frame for better visibility
+        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
+        btn_frame.grid_columnconfigure(0, weight=1)
+
+        # Install button - centered
+        self.locale_install_btn = ctk.CTkButton(
+            btn_frame,
             text=t("install_locale", "安装语言环境", "Install Locale"),
             font=ctk.CTkFont(size=14),
             height=45,
+            width=200,
             command=self._install_locale,
         )
-        install_btn.grid(row=2, column=0, padx=20, pady=20)
+        self.locale_install_btn.grid(row=0, column=0, pady=10)
 
     def _create_font_tab(self):
         """Create font installation tab"""
