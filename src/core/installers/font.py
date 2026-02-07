@@ -8,9 +8,9 @@ import shutil
 from typing import Tuple, Optional, Callable, Dict
 from src.utils import (
     run_command,
-    disable_readonly_if_needed,
-    enable_readonly,
+    run_script_as_root,
     is_fonts_installed,
+    is_steamos_system,
 )
 from src.config import Config
 from .base import BaseInstaller
@@ -45,89 +45,93 @@ class FontInstaller(BaseInstaller):
             if not os.path.isfile(self.zip_path):
                 return False, f"ERROR: Font package not found: {self.zip_path}"
 
-            # Check if readonly mode needs to be disabled
-            print("[1/6] Checking if readonly mode needs to be disabled...")
-            if not disable_readonly_if_needed(self.fonts_dir):
-                return (
-                    False,
-                    "ERROR: Failed to disable readonly mode, please check permissions",
-                )
-
-            try:
-                # Create temporary extraction directory (in user space, no sudo needed)
-                if os.path.exists(self.temp_dir):
-                    shutil.rmtree(self.temp_dir)
-                os.makedirs(self.temp_dir, exist_ok=True)
-
-                # Extract font package (to temp dir, no sudo needed)
-                print("[2/6] Extracting font package...")
-                with zipfile.ZipFile(self.zip_path, "r") as zip_ref:
-                    zip_ref.extractall(self.temp_dir)
-
-                # Create target directory with sudo
-                print("[3/6] Creating fonts directory...")
-                success, msg = run_command(f"mkdir -p {self.fonts_dir}", use_sudo=True)
-                if not success:
-                    return False, f"ERROR: Failed to create fonts directory: {msg}"
-
-                # Copy font files with sudo, skip existing ones
-                print("[4/6] Copying font files...")
-                font_count = 0
-                skip_count = 0
-
-                for root, dirs, files in os.walk(self.temp_dir):
-                    for file in files:
-                        src_file = os.path.join(root, file)
-                        dst_file = os.path.join(self.fonts_dir, file)
-
-                        # Check if file exists (need to check with sudo)
-                        check_result, _ = run_command(
-                            f"test -f '{dst_file}'", use_sudo=True
-                        )
-                        if check_result:
-                            print(f"[SKIP] File already exists: {file}")
-                            skip_count += 1
-                        else:
-                            # Copy with sudo
-                            success, msg = run_command(
-                                f"cp '{src_file}' '{dst_file}'", use_sudo=True
-                            )
-                            if success:
-                                print(f"[OK] Copied: {file}")
-                                font_count += 1
-                            else:
-                                print(f"[ERROR] Failed to copy {file}: {msg}")
-
-                # Update font cache
-                print("[5/6] Updating font cache...")
-                success, msg = run_command("fc-cache -fv", use_sudo=True)
-                if not success:
-                    # Font cache update failure does not affect final result
-                    print(f"[WARN] Font cache update may have failed: {msg}")
-
-                # Clean temporary directory (user space, no sudo needed)
+            # Create temporary extraction directory (in user space, no sudo needed)
+            print("[1/4] Preparing font package...")
+            if os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
+            os.makedirs(self.temp_dir, exist_ok=True)
 
-                # Re-enable readonly mode
-                print("[6/6] Re-enabling SteamOS readonly mode...")
-                if not enable_readonly():
-                    return (
-                        False,
-                        f"WARNING: Failed to re-enable readonly mode, please manually run 'sudo steamos-readonly enable'\nBUT: Fonts installed successfully! Copied {font_count} files, skipped {skip_count} existing files",
-                    )
+            # Extract font package (to temp dir, no sudo needed)
+            print("[2/4] Extracting font package...")
+            with zipfile.ZipFile(self.zip_path, "r") as zip_ref:
+                zip_ref.extractall(self.temp_dir)
 
-                return (
-                    True,
-                    f"SUCCESS: Font installation completed!\nCopied {font_count} files\nSkipped {skip_count} existing files",
+            # Collect all font files to copy
+            font_files = []
+            for root, dirs, files in os.walk(self.temp_dir):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    font_files.append((src_file, file))
+
+            if not font_files:
+                shutil.rmtree(self.temp_dir)
+                return False, "ERROR: No font files found in the package"
+
+            # Build a single script that does all privileged operations
+            print("[3/4] Installing fonts (requires authentication)...")
+            script_lines = []
+
+            # Add SteamOS readonly disable if needed
+            if is_steamos_system():
+                script_lines.append("# Disable SteamOS readonly mode")
+                script_lines.append("steamos-readonly disable || true")
+
+            # Create fonts directory
+            script_lines.append(f"# Create fonts directory")
+            script_lines.append(f"mkdir -p '{self.fonts_dir}'")
+
+            # Copy each font file (skip if exists)
+            script_lines.append("# Copy font files")
+            font_count = 0
+            for src_file, filename in font_files:
+                dst_file = os.path.join(self.fonts_dir, filename)
+                # Use cp -n to skip existing files (no-clobber)
+                script_lines.append(
+                    f"cp -n '{src_file}' '{dst_file}' 2>/dev/null || true"
+                )
+                font_count += 1
+
+            # Update font cache
+            script_lines.append("# Update font cache")
+            script_lines.append("fc-cache -fv >/dev/null 2>&1 || true")
+
+            # Re-enable SteamOS readonly mode
+            if is_steamos_system():
+                script_lines.append("# Re-enable SteamOS readonly mode")
+                script_lines.append("steamos-readonly enable || true")
+
+            # Execute all commands with a single authentication prompt
+            script_content = "\n".join(script_lines)
+            success, msg = run_script_as_root(script_content)
+
+            # Clean temporary directory (user space, no sudo needed)
+            print("[4/4] Cleaning up...")
+            shutil.rmtree(self.temp_dir)
+
+            if not success:
+                return False, f"ERROR: Font installation failed: {msg}"
+
+            # Count actually installed fonts
+            installed_count = 0
+            if os.path.isdir(self.fonts_dir):
+                installed_count = len(
+                    [
+                        f
+                        for f in os.listdir(self.fonts_dir)
+                        if os.path.isfile(os.path.join(self.fonts_dir, f))
+                    ]
                 )
 
-            except Exception as e:
-                enable_readonly()
-                return False, f"ERROR: Installation failed: {str(e)}"
+            return (
+                True,
+                f"SUCCESS: Font installation completed!\nProcessed {font_count} files\nTotal installed fonts: {installed_count}",
+            )
 
         except Exception as e:
+            # Clean up on error
             try:
-                enable_readonly()
+                if os.path.exists(self.temp_dir):
+                    shutil.rmtree(self.temp_dir)
             except:
                 pass
             return False, f"ERROR: Exception occurred: {str(e)}"

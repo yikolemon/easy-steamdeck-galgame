@@ -2,7 +2,7 @@
 Utility functions module
 """
 
-from .command import run_command
+from .command import run_command, run_script_as_root, run_commands_as_root
 from .system import (
     is_steamos_system,
     is_path_writable,
@@ -18,6 +18,8 @@ from .path import get_home_dir, get_config_dir
 
 __all__ = [
     "run_command",
+    "run_script_as_root",
+    "run_commands_as_root",
     "is_steamos_system",
     "is_path_writable",
     "is_directory_writable",
