@@ -51,7 +51,7 @@ def main():
         from src.gui.main import GUIApplication
 
         app = GUIApplication()
-        app.run()
+        app.mainloop()
     except ImportError as e:
         print(f"错误: 无法导入 GUI 模块: {e}")
         print("请确保已安装所有依赖: pip install -r requirements.txt")
