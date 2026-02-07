@@ -903,7 +903,7 @@ class GUIApplication(ctk.CTk):
         """Download font with progress dialog, then confirm before installing"""
         dialog = ctk.CTkToplevel(self)
         dialog.title(t("downloading", "下载中", "Downloading"))
-        dialog.geometry("480x220")
+        dialog.geometry("480x280")
         dialog.resizable(False, False)
         dialog.transient(self)
 
@@ -963,7 +963,7 @@ class GUIApplication(ctk.CTk):
         # Center and grab after content is created
         dialog.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - 480) // 2
-        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        y = self.winfo_y() + (self.winfo_height() - 280) // 2
         dialog.geometry(f"+{x}+{y}")
         dialog.after(100, lambda: dialog.grab_set())
 
