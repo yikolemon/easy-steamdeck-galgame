@@ -59,20 +59,70 @@ jobs:
             ls -lh dist/
             exit 1
           fi
+      
+      - name: Create release package (${{ matrix.build-type }})
+        run: |
+          # Create package directory
+          PACKAGE_NAME="steamdeck-galgame-${{ matrix.build-type }}"
+          PACKAGE_DIR="dist/${PACKAGE_NAME}"
+          mkdir -p "${PACKAGE_DIR}"
+          
+          # Move executable into package directory
+          mv "dist/steamdeck-galgame-${{ matrix.build-type }}" "${PACKAGE_DIR}/steamdeck-galgame"
+          
+          # Copy installation scripts and desktop file
+          cp install_desktop.sh "${PACKAGE_DIR}/"
+          cp steamdeck-galgame.desktop "${PACKAGE_DIR}/"
+          
+          # Create README for the package
+          cat > "${PACKAGE_DIR}/README.txt" << 'EOF'
+          SteamDeck Galgame - 中文游戏环境配置工具
+          ==========================================
+          
+          快速开始:
+          ---------
+          1. 解压到任意目录
+          2. 运行安装脚本创建桌面快捷方式:
+             chmod +x install_desktop.sh
+             ./install_desktop.sh
+          
+          3. 从应用菜单启动 "SteamDeck Galgame" 或 "中文游戏助手"
+          
+          或者直接运行:
+          -------------
+          chmod +x steamdeck-galgame
+          ./steamdeck-galgame
+          
+          文件说明:
+          ---------
+          - steamdeck-galgame      : 主程序
+          - install_desktop.sh    : 桌面快捷方式安装脚本
+          - steamdeck-galgame.desktop : 桌面快捷方式模板
+          
+          更多信息请访问: https://github.com/yikolemon/steamdeck-galgame
+          EOF
+          
+          # Make scripts executable
+          chmod +x "${PACKAGE_DIR}/steamdeck-galgame"
+          chmod +x "${PACKAGE_DIR}/install_desktop.sh"
+          
+          # List package contents
+          echo "Package contents:"
+          ls -lh "${PACKAGE_DIR}/"
           
       - name: Create tarball (${{ matrix.build-type }})
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          tar -czf steamdeck-galgame-${{ matrix.build-type }}.tar.gz steamdeck-galgame-${{ matrix.build-type }}
-          ls -lh steamdeck-galgame-${{ matrix.build-type }}*
+          PACKAGE_NAME="steamdeck-galgame-${{ matrix.build-type }}"
+          tar -czf "${PACKAGE_NAME}.tar.gz" "${PACKAGE_NAME}"
+          ls -lh "${PACKAGE_NAME}.tar.gz"
           
       - name: Upload artifacts (${{ matrix.build-type }})
         uses: actions/upload-artifact@v4
         with:
           name: pyinstaller-${{ matrix.build-type }}
           path: |
-            dist/steamdeck-galgame-${{ matrix.build-type }}
+            dist/steamdeck-galgame-${{ matrix.build-type }}/
             dist/steamdeck-galgame-${{ matrix.build-type }}.tar.gz
           retention-days: 30
   
@@ -90,53 +140,61 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          cp all-artifacts/pyinstaller-debug/* release-assets/ || true
-          cp all-artifacts/pyinstaller-release/* release-assets/ || true
+          # Copy tar.gz files for release
+          find all-artifacts -name "*.tar.gz" -exec cp {} release-assets/ \;
           ls -lh release-assets/
           
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            release-assets/steamdeck-galgame-debug
-            release-assets/steamdeck-galgame-release
             release-assets/steamdeck-galgame-debug.tar.gz
             release-assets/steamdeck-galgame-release.tar.gz
           body: |
             ## SteamDeck Galgame Config Tool (GUI Version)
             
-            Standalone GUI executables that require NO Python installation!
+            开箱即用的 SteamDeck 中文游戏环境配置工具！
             
-            ### Release Version (steamdeck-galgame-release)
-            - Production-ready executable
-            - Minimal logging (INFO level)
-            - Recommended for daily use
+            ### 下载说明
             
-            ### Debug Version (steamdeck-galgame-debug)
-            - Development/troubleshooting build
-            - All debug logs enabled
-            - Use when reporting issues
+            | 版本 | 说明 |
+            |------|------|
+            | `steamdeck-galgame-release.tar.gz` | **推荐** - 日常使用版本 |
+            | `steamdeck-galgame-debug.tar.gz` | 调试版本，用于问题排查 |
             
-            ### Usage:
+            ### 安装步骤
+            
             ```bash
-            # Download and run (Release recommended):
-            chmod +x steamdeck-galgame-release
-            ./steamdeck-galgame-release
+            # 1. 解压到任意目录
+            tar -xzf steamdeck-galgame-release.tar.gz
+            cd steamdeck-galgame-release
             
-            # Debug version:
-            chmod +x steamdeck-galgame-debug
-            ./steamdeck-galgame-debug
+            # 2. 安装桌面快捷方式（可选，推荐）
+            ./install_desktop.sh
+            
+            # 3. 从应用菜单启动，或直接运行：
+            ./steamdeck-galgame
             ```
             
-            ### Features:
-            - [x] No Python required
-            - [x] No pip required
-            - [x] All dependencies bundled
-            - [x] Ready to use on SteamDeck
-            - [x] GUI interface (Tkinter)
-            - [x] Chinese/Japanese locale installation
-            - [x] Font installation
-            - [x] Steam game integration
+            ### 包内容
+            
+            ```
+            steamdeck-galgame-release/
+            ├── steamdeck-galgame        # 主程序
+            ├── install_desktop.sh       # 桌面快捷方式安装脚本
+            ├── steamdeck-galgame.desktop # 桌面快捷方式模板
+            └── README.txt               # 说明文档
+            ```
+            
+            ### 功能特性
+            
+            - [x] 无需安装 Python
+            - [x] 所有依赖已打包
+            - [x] 图形界面 (CustomTkinter)
+            - [x] 一键安装中文/日文语言环境
+            - [x] 一键安装中文字体
+            - [x] Steam 游戏启动参数管理
+            - [x] 支持添加到应用菜单
           draft: false
           prerelease: false
         env:

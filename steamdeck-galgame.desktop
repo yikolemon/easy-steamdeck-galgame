@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=SteamDeck Galgame
+Name[zh_CN]=SteamDeck 中文游戏助手
+Comment=Configure Chinese/Japanese game environment on SteamDeck
+Comment[zh_CN]=SteamDeck 中文/日文游戏环境配置工具
+Exec=EXEC_PATH_PLACEHOLDER
+Icon=applications-games
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+Keywords=steamdeck;galgame;chinese;japanese;fonts;locale;
+StartupNotify=true
