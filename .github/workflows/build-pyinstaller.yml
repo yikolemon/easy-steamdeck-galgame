@@ -117,9 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pyinstaller-${{ matrix.build-type }}
-          path: |
-            dist/steamdeck-galgame-${{ matrix.build-type }}/
-            dist/steamdeck-galgame-${{ matrix.build-type }}.tar.gz
+          path: dist/steamdeck-galgame-${{ matrix.build-type }}.tar.gz
           retention-days: 30
   
   create-release:
