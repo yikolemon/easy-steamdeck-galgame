@@ -505,11 +505,12 @@ class GUIApplication(ctk.CTk):
         ctk.CTkLabel(
             options_frame, text=t("from_github", "从 GitHub 下载:", "From GitHub:")
         ).grid(row=1, column=0, padx=(25, 10), pady=10, sticky="w")
-        ctk.CTkButton(
+        self.font_download_btn = ctk.CTkButton(
             options_frame,
             text=t("download", "下载安装", "Download & Install"),
             command=self._install_fonts_github,
-        ).grid(row=1, column=1, padx=10, pady=10, sticky="w")
+        )
+        self.font_download_btn.grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
         # Local file
         ctk.CTkLabel(
@@ -814,6 +815,10 @@ class GUIApplication(ctk.CTk):
 
     def _install_fonts_github(self):
         """Install fonts from GitHub"""
+        # 禁用按钮并修改文本显示处理中
+        self.font_download_btn.configure(
+            state="disabled", text=t("downloading", "处理中...", "Working...")
+        )
         self._log(
             t(
                 "fetching_fonts",
@@ -823,26 +828,54 @@ class GUIApplication(ctk.CTk):
             "info",
         )
 
+        def restore_btn():
+            self.font_download_btn.configure(
+                state="normal", text=t("download", "下载安装", "Download & Install")
+            )
+
         def fetch_and_show():
             try:
                 success, assets = list_available_fonts()
                 if not success or not assets:
-                    self.after(
-                        0,
-                        lambda: self._log(
+
+                    def fail_ui():
+                        self._log(
                             t(
                                 "fetch_failed",
                                 "获取字体列表失败",
                                 "Failed to fetch font list",
                             ),
                             "error",
-                        ),
-                    )
+                        )
+                        show_error(
+                            self,
+                            t("error", "错误", "Error"),
+                            t(
+                                "fetch_failed",
+                                "获取字体列表失败",
+                                "Failed to fetch font list",
+                            ),
+                        )
+                        restore_btn()
+
+                    self.after(0, fail_ui)
                     return
 
-                self.after(0, lambda: self._show_font_selection(assets))
+                self.after(
+                    0, lambda: [restore_btn(), self._show_font_selection(assets)]
+                )
             except Exception as e:
-                self.after(0, lambda: self._log(f"Error: {str(e)}", "error"))
+
+                def err_ui():
+                    self._log(f"Error: {str(e)}", "error")
+                    show_error(
+                        self,
+                        t("error", "错误", "Error"),
+                        t("unknown_error", "未知错误", "Unknown error") + ": " + str(e),
+                    )
+                    restore_btn()
+
+                self.after(0, err_ui)
 
         threading.Thread(target=fetch_and_show, daemon=True).start()
 
