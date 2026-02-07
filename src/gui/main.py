@@ -787,9 +787,13 @@ class GUIApplication(ctk.CTk):
             "info",
         )
 
+        def log_to_gui(message: str):
+            """Thread-safe logging to GUI"""
+            self.after(0, lambda: self._log(message, "info"))
+
         def task():
             try:
-                success, msg = setup_locale(locale_code)
+                success, msg = setup_locale(locale_code, log_callback=log_to_gui)
                 self.after(0, lambda: self._on_task_complete(success, msg))
             except Exception as e:
                 self.after(0, lambda: self._on_task_complete(False, str(e)))
