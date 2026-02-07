@@ -29,6 +29,67 @@ from src.core.steam_manager import (
 )
 
 
+class ScrollableFrame(ttk.Frame):
+    """A scrollable frame container that can be used in dialogs"""
+
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+
+        # Create canvas and scrollbar
+        self.canvas = tk.Canvas(self, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(
+            self, orient="vertical", command=self.canvas.yview
+        )
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        # Configure scrolling
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
+
+        self.canvas_frame = self.canvas.create_window(
+            (0, 0), window=self.scrollable_frame, anchor="nw"
+        )
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Bind canvas resize to adjust frame width
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+
+        # Pack canvas and scrollbar
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Bind mousewheel
+        self.scrollable_frame.bind("<Enter>", self._bind_mousewheel)
+        self.scrollable_frame.bind("<Leave>", self._unbind_mousewheel)
+
+    def _on_canvas_configure(self, event):
+        """Adjust the scrollable frame width to match canvas"""
+        self.canvas.itemconfig(self.canvas_frame, width=event.width)
+
+    def _bind_mousewheel(self, event):
+        """Bind mousewheel when mouse enters"""
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, event):
+        """Unbind mousewheel when mouse leaves"""
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Button-4>")
+        self.canvas.unbind_all("<Button-5>")
+
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scroll"""
+        if event.num == 4:  # Linux scroll up
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5:  # Linux scroll down
+            self.canvas.yview_scroll(1, "units")
+        else:  # Windows/macOS
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+
 class GUIApplication:
     """Main GUI Application using Tkinter"""
 
@@ -529,6 +590,42 @@ class GUIApplication:
         self.log_text.tag_configure("error", foreground="red")
         self.log_text.tag_configure("warning", foreground="orange")
 
+    def _create_dialog(
+        self,
+        title: str,
+        width: int = 400,
+        height: int = 300,
+        min_width: int = 300,
+        min_height: int = 200,
+    ) -> tk.Toplevel:
+        """
+        Create a dialog window with proper sizing and centering.
+
+        Args:
+            title: Dialog title
+            width: Preferred width
+            height: Preferred height
+            min_width: Minimum width
+            min_height: Minimum height
+
+        Returns:
+            The created Toplevel dialog
+        """
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.geometry(f"{width}x{height}")
+        dialog.minsize(min_width, min_height)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Center dialog relative to main window
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - width) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - height) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        return dialog
+
     def _log(self, message: str, level: str = "info"):
         """Add message to log"""
         self.log_text.config(state="normal")
@@ -539,14 +636,13 @@ class GUIApplication:
 
     def _show_language_dialog(self):
         """Show language selection dialog"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(t("select_lang", "选择目标语言", "Select Target Language"))
-        dialog.geometry("300x150")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        # Center dialog
-        dialog.geometry(f"+{self.root.winfo_x() + 250}+{self.root.winfo_y() + 200}")
+        dialog = self._create_dialog(
+            title=t("select_lang", "选择目标语言", "Select Target Language"),
+            width=350,
+            height=200,
+            min_width=300,
+            min_height=180,
+        )
 
         frame = ttk.Frame(dialog, padding="20")
         frame.pack(fill=tk.BOTH, expand=True)
@@ -555,7 +651,7 @@ class GUIApplication:
             frame,
             text=t("choose_lang", "请选择目标语言:", "Choose target language:"),
             style="Header.TLabel",
-        ).pack(pady=10)
+        ).pack(pady=(0, 15))
 
         lang_var = tk.StringVar(value=self.target_language or TargetLanguage.CHINESE)
 
@@ -564,13 +660,13 @@ class GUIApplication:
             text="简体中文 (Simplified Chinese)",
             variable=lang_var,
             value=TargetLanguage.CHINESE,
-        ).pack(anchor=tk.W)
+        ).pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(
             frame,
             text="日本語 (Japanese)",
             variable=lang_var,
             value=TargetLanguage.JAPANESE,
-        ).pack(anchor=tk.W)
+        ).pack(anchor=tk.W, pady=2)
 
         def on_confirm():
             self.target_language = lang_var.get()
@@ -587,9 +683,15 @@ class GUIApplication:
                 "success",
             )
 
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=(20, 0))
+
         ttk.Button(
-            frame, text=t("confirm", "确认", "Confirm"), command=on_confirm
-        ).pack(pady=10)
+            btn_frame, text=t("confirm", "确认", "Confirm"), command=on_confirm
+        ).pack(side=tk.LEFT, padx=5)
+        ttk.Button(
+            btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
+        ).pack(side=tk.LEFT, padx=5)
 
     def _install_locale(self):
         """Install locale"""
@@ -1128,20 +1230,26 @@ class GUIApplication:
         # Get game name
         default_name = os.path.splitext(os.path.basename(file_path))[0]
 
-        # Show name input dialog
-        dialog = tk.Toplevel(self.root)
-        dialog.title(t("add_game", "添加游戏", "Add Game"))
-        dialog.geometry("400x200")
-        dialog.transient(self.root)
-        dialog.grab_set()
+        # Show name input dialog with scrollable frame for long content
+        dialog = self._create_dialog(
+            title=t("add_game", "添加游戏", "Add Game"),
+            width=450,
+            height=320,
+            min_width=400,
+            min_height=280,
+        )
 
-        frame = ttk.Frame(dialog, padding="20")
+        # Use ScrollableFrame for content that may overflow
+        scroll_container = ScrollableFrame(dialog)
+        scroll_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        frame = ttk.Frame(scroll_container.scrollable_frame, padding="15")
         frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frame, text=t("game_exe", "可执行文件:", "Executable:")).pack(
             anchor=tk.W
         )
-        ttk.Label(frame, text=file_path, foreground="blue", wraplength=350).pack(
+        ttk.Label(frame, text=file_path, foreground="blue", wraplength=380).pack(
             anchor=tk.W, pady=5
         )
 
@@ -1149,14 +1257,14 @@ class GUIApplication:
             anchor=tk.W, pady=(10, 0)
         )
         name_var = tk.StringVar(value=default_name)
-        name_entry = ttk.Entry(frame, textvariable=name_var, width=40)
+        name_entry = ttk.Entry(frame, textvariable=name_var, width=45)
         name_entry.pack(fill=tk.X, pady=5)
 
         launch_options = get_locale_command(self.target_language)
         ttk.Label(frame, text=t("launch_opts", "启动选项:", "Launch Options:")).pack(
             anchor=tk.W, pady=(10, 0)
         )
-        ttk.Label(frame, text=launch_options, foreground="green", wraplength=350).pack(
+        ttk.Label(frame, text=launch_options, foreground="green", wraplength=380).pack(
             anchor=tk.W
         )
 
@@ -1206,8 +1314,9 @@ class GUIApplication:
 
             threading.Thread(target=task, daemon=True).start()
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=10)
+        # Button frame outside scrollable area to ensure visibility
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, pady=10, padx=15)
 
         ttk.Button(btn_frame, text=t("add", "添加", "Add"), command=on_add).pack(
             side=tk.LEFT, padx=5
