@@ -366,7 +366,12 @@ class GUIApplication(ctk.CTk):
         """Create Steam game management tab"""
         tab = self.tab_steam
         tab.grid_columnconfigure(0, weight=1)
-        tab.grid_rowconfigure(1, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        # Scrollable container
+        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -374,21 +379,22 @@ class GUIApplication(ctk.CTk):
             "管理由本程序添加到Steam库的游戏。",
             "Manage games added to Steam library by this program.",
         )
-        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+        ctk.CTkLabel(scroll, text=desc_text, wraplength=700).grid(
             row=0, column=0, padx=10, pady=10, sticky="w"
         )
 
         # Games frame
-        games_frame = ctk.CTkFrame(tab)
-        games_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        games_frame = ctk.CTkFrame(scroll)
+        games_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
         games_frame.grid_columnconfigure(0, weight=1)
-        games_frame.grid_rowconfigure(0, weight=1)
 
         # Scrollable frame for games list
         self.games_scroll = ctk.CTkScrollableFrame(
-            games_frame, label_text=t("managed_games", "已添加的游戏", "Managed Games")
+            games_frame,
+            label_text=t("managed_games", "已添加的游戏", "Managed Games"),
+            height=200,
         )
-        self.games_scroll.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.games_scroll.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.games_scroll.grid_columnconfigure(0, weight=2)
         self.games_scroll.grid_columnconfigure(1, weight=3)
         self.games_scroll.grid_columnconfigure(2, weight=1)
@@ -411,7 +417,7 @@ class GUIApplication(ctk.CTk):
         ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
 
         # Button frame
-        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
         ctk.CTkButton(
@@ -433,8 +439,12 @@ class GUIApplication(ctk.CTk):
         """Create locale installation tab"""
         tab = self.tab_locale
         tab.grid_columnconfigure(0, weight=1)
-        tab.grid_rowconfigure(1, weight=0)  # Steps frame doesn't expand
-        tab.grid_rowconfigure(2, weight=0)  # Button row doesn't expand
+        tab.grid_rowconfigure(0, weight=1)
+
+        # Scrollable container
+        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -442,12 +452,12 @@ class GUIApplication(ctk.CTk):
             "安装系统语言环境，使游戏能够正确显示中文/日文。\n此操作需要root权限，将会修改系统文件。",
             "Install system locale to display Chinese/Japanese in games.\nThis requires root permission and will modify system files.",
         )
-        ctk.CTkLabel(tab, text=desc_text, wraplength=700, justify="left").grid(
+        ctk.CTkLabel(scroll, text=desc_text, wraplength=700, justify="left").grid(
             row=0, column=0, padx=20, pady=15, sticky="w"
         )
 
         # Steps frame
-        steps_frame = ctk.CTkFrame(tab)
+        steps_frame = ctk.CTkFrame(scroll)
         steps_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         steps_frame.grid_columnconfigure(0, weight=1)
 
@@ -473,7 +483,7 @@ class GUIApplication(ctk.CTk):
         ctk.CTkLabel(steps_frame, text="").grid(row=len(steps) + 1, column=0, pady=5)
 
         # Button frame for better visibility
-        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
         btn_frame.grid_columnconfigure(0, weight=1)
 
@@ -492,6 +502,12 @@ class GUIApplication(ctk.CTk):
         """Create font installation tab"""
         tab = self.tab_fonts
         tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        # Scrollable container
+        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -499,12 +515,12 @@ class GUIApplication(ctk.CTk):
             "安装中文/日文字体，确保游戏能够正确显示文字。",
             "Install Chinese/Japanese fonts for proper text display in games.",
         )
-        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+        ctk.CTkLabel(scroll, text=desc_text, wraplength=700).grid(
             row=0, column=0, padx=20, pady=15, sticky="w"
         )
 
         # Options frame
-        options_frame = ctk.CTkFrame(tab)
+        options_frame = ctk.CTkFrame(scroll)
         options_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         options_frame.grid_columnconfigure(1, weight=1)
 
@@ -569,6 +585,12 @@ class GUIApplication(ctk.CTk):
         """Create game launcher options tab"""
         tab = self.tab_launcher
         tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        # Scrollable container
+        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
         # Description
         desc_text = t(
@@ -576,12 +598,12 @@ class GUIApplication(ctk.CTk):
             "获取游戏启动命令，用于在Steam中配置游戏以使用中文/日文环境。",
             "Get game launch commands to configure games in Steam for Chinese/Japanese environment.",
         )
-        ctk.CTkLabel(tab, text=desc_text, wraplength=700).grid(
+        ctk.CTkLabel(scroll, text=desc_text, wraplength=700).grid(
             row=0, column=0, padx=20, pady=15, sticky="w"
         )
 
         # Launch command frame
-        cmd_frame = ctk.CTkFrame(tab)
+        cmd_frame = ctk.CTkFrame(scroll)
         cmd_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         cmd_frame.grid_columnconfigure(0, weight=1)
 
@@ -618,7 +640,7 @@ class GUIApplication(ctk.CTk):
         ).grid(row=0, column=1)
 
         # Instructions frame
-        instr_frame = ctk.CTkFrame(tab)
+        instr_frame = ctk.CTkFrame(scroll)
         instr_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
         ctk.CTkLabel(
