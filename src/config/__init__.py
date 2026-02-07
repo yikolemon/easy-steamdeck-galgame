@@ -42,10 +42,7 @@ class Config:
     # System configuration
     FONTS_DIR = "/usr/share/fonts/galgame"
     TEMP_EXTRACT_DIR = "/tmp/galgame_fonts_extract"
-    STEAM_USER_DIR = os.path.join(os.path.expanduser("~"), ".steam/root/userdata")
-    CONFIG_FILE = os.path.join(
-        os.path.expanduser("~"), ".steamdeck_galgame_config.json"
-    )
+    CONFIG_FILE_NAME = ".steamdeck_galgame_config.json"
 
     # Application configuration
     APP_NAME = "SteamDeck Chinese Environment Config Tool"
@@ -54,6 +51,39 @@ class Config:
     # Runtime configuration (set by user)
     _target_language: Optional[str] = None
     _default_font_path: Optional[str] = None
+    _config_file: Optional[str] = None
+    _steam_dir: Optional[str] = None
+
+    @classmethod
+    def _get_home_dir(cls) -> str:
+        """Get user home directory with fallbacks"""
+        # Try multiple methods to get home directory
+        home = os.environ.get("HOME")
+        if home and os.path.isdir(home):
+            return home
+
+        home = os.path.expanduser("~")
+        if home and home != "~" and os.path.isdir(home):
+            return home
+
+        # Fallback for edge cases
+        import pwd
+
+        try:
+            home = pwd.getpwuid(os.getuid()).pw_dir
+            if home and os.path.isdir(home):
+                return home
+        except Exception:
+            pass
+
+        return "/home"
+
+    @classmethod
+    def _get_config_file(cls) -> str:
+        """Get config file path"""
+        if cls._config_file is None:
+            cls._config_file = os.path.join(cls._get_home_dir(), cls.CONFIG_FILE_NAME)
+        return cls._config_file
 
     @classmethod
     def get_fonts_dir(cls) -> str:
@@ -68,7 +98,9 @@ class Config:
     @classmethod
     def get_steam_dir(cls) -> str:
         """Get Steam user data directory"""
-        return cls.STEAM_USER_DIR
+        if cls._steam_dir is None:
+            cls._steam_dir = os.path.join(cls._get_home_dir(), ".steam/root/userdata")
+        return cls._steam_dir
 
     @classmethod
     def get_app_info(cls) -> Dict[str, str]:
@@ -140,8 +172,9 @@ class Config:
     def load_config(cls) -> Dict[str, Any]:
         """Load configuration from file"""
         try:
-            if os.path.exists(cls.CONFIG_FILE):
-                with open(cls.CONFIG_FILE, "r") as f:
+            config_file = cls._get_config_file()
+            if os.path.exists(config_file):
+                with open(config_file, "r") as f:
                     return json.load(f)
         except Exception:
             pass
@@ -151,9 +184,10 @@ class Config:
     def save_config(cls, config: Dict[str, Any]):
         """Save configuration to file"""
         try:
+            config_file = cls._get_config_file()
             existing = cls.load_config()
             existing.update(config)
-            with open(cls.CONFIG_FILE, "w") as f:
+            with open(config_file, "w") as f:
                 json.dump(existing, f, indent=2)
         except Exception as e:
             print(f"Warning: Failed to save config: {e}")

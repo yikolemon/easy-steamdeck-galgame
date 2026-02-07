@@ -4,11 +4,24 @@ Handles adding non-Steam games to Steam library
 """
 
 import os
+import sys
 import struct
 import binascii
 from typing import List, Tuple, Dict, Optional
 from src.config import Config
 from src.utils import get_home_dir
+
+
+def debug_log(message: str):
+    """Print debug message when running in debug mode"""
+    # Check if running in debug mode (debug build or console available)
+    if hasattr(sys, "frozen"):
+        # PyInstaller bundled app - check if it's debug build
+        if "debug" in sys.executable.lower():
+            print(f"[DEBUG] {message}")
+    else:
+        # Running from source
+        print(f"[DEBUG] {message}")
 
 
 class SteamManager:
@@ -21,19 +34,45 @@ class SteamManager:
         Returns: List of userdata directory paths
         """
         steam_dir = Config.get_steam_dir()
+        debug_log(f"Steam userdata directory: {steam_dir}")
+        debug_log(f"Directory exists: {os.path.exists(steam_dir)}")
+
         try:
             if not os.path.exists(steam_dir):
-                return []
+                debug_log(f"Steam directory does not exist: {steam_dir}")
+                # Try alternative paths
+                alt_paths = [
+                    os.path.join(os.path.expanduser("~"), ".steam/root/userdata"),
+                    os.path.join(os.path.expanduser("~"), ".steam/steam/userdata"),
+                    os.path.join(
+                        os.path.expanduser("~"), ".local/share/Steam/userdata"
+                    ),
+                ]
+                for alt_path in alt_paths:
+                    debug_log(f"Trying alternative path: {alt_path}")
+                    if os.path.exists(alt_path):
+                        debug_log(f"Found alternative path: {alt_path}")
+                        steam_dir = alt_path
+                        break
+                else:
+                    debug_log("No Steam userdata directory found in any location")
+                    return []
 
             # List all user IDs
+            debug_log(f"Listing contents of: {steam_dir}")
             user_dirs = []
             for user_id in os.listdir(steam_dir):
                 user_path = os.path.join(steam_dir, user_id)
-                if os.path.isdir(user_path) and user_id.isdigit():
+                is_dir = os.path.isdir(user_path)
+                is_digit = user_id.isdigit()
+                debug_log(f"  Found: {user_id} (isdir={is_dir}, isdigit={is_digit})")
+                if is_dir and is_digit:
                     user_dirs.append(user_path)
 
+            debug_log(f"Found {len(user_dirs)} user directories: {user_dirs}")
             return user_dirs
         except Exception as e:
+            debug_log(f"Error getting Steam userdata directories: {e}")
             print(f"Error getting Steam userdata directories: {e}")
             return []
 
@@ -283,12 +322,17 @@ class SteamManager:
             (success, message)
         """
         try:
+            debug_log(f"Adding non-Steam game: {app_name}")
+            debug_log(f"Executable path: {exe_path}")
+
             # Validate exe exists
             if not os.path.exists(exe_path):
                 return False, f"ERROR: Executable not found: {exe_path}"
 
             # Get Steam user directories
+            debug_log("Getting Steam user directories...")
             user_dirs = SteamManager.get_steam_userdata_dirs()
+            debug_log(f"User directories found: {user_dirs}")
 
             if not user_dirs:
                 return False, "ERROR: No Steam user directories found"
