@@ -849,19 +849,228 @@ class GUIApplication:
         ).pack(side=tk.LEFT, padx=5)
 
     def _download_and_install_font(self, asset):
-        """Download and install font"""
+        """Download font with progress dialog, then confirm before installing"""
+        # Create download progress dialog
+        dialog = self._create_dialog(
+            title=t("downloading", "下载中", "Downloading"),
+            width=450,
+            height=200,
+            min_width=400,
+            min_height=180,
+        )
+
+        # Prevent closing during download
+        dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        frame = ttk.Frame(dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        # File name label
+        ttk.Label(
+            frame,
+            text=t("downloading_file", "正在下载文件:", "Downloading file:"),
+            style="Header.TLabel",
+        ).pack(anchor=tk.W)
+        ttk.Label(frame, text=asset.name, foreground="blue").pack(
+            anchor=tk.W, pady=(0, 10)
+        )
+
+        # Progress bar
+        progress_var = tk.DoubleVar(value=0)
+        progress_bar = ttk.Progressbar(
+            frame, variable=progress_var, maximum=100, length=380, mode="determinate"
+        )
+        progress_bar.pack(fill=tk.X, pady=5)
+
+        # Progress text
+        progress_text_var = tk.StringVar(value="0%  0.00 / 0.00 MB")
+        progress_label = ttk.Label(frame, textvariable=progress_text_var)
+        progress_label.pack(anchor=tk.W)
+
+        # Status label
+        status_var = tk.StringVar(value=t("connecting", "正在连接...", "Connecting..."))
+        status_label = ttk.Label(frame, textvariable=status_var, foreground="gray")
+        status_label.pack(anchor=tk.W, pady=(5, 0))
+
+        # Cancel button (initially hidden, will be replaced by result buttons)
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, pady=10, padx=15)
+
+        # Track download state
+        download_state = {
+            "cancelled": False,
+            "success": False,
+            "zip_path": None,
+            "error_msg": None,
+        }
+
+        def on_cancel():
+            download_state["cancelled"] = True
+            status_var.set(t("cancelling", "正在取消...", "Cancelling..."))
+
+        cancel_btn = ttk.Button(
+            btn_frame, text=t("cancel", "取消", "Cancel"), command=on_cancel
+        )
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+
+        def update_progress(downloaded: int, total: int):
+            """Update progress bar from download callback"""
+            if total > 0:
+                percent = (downloaded / total) * 100
+                mb_downloaded = downloaded / (1024 * 1024)
+                mb_total = total / (1024 * 1024)
+
+                def do_update():
+                    progress_var.set(percent)
+                    progress_text_var.set(
+                        f"{percent:.1f}%  {mb_downloaded:.2f} / {mb_total:.2f} MB"
+                    )
+                    status_var.set(t("downloading", "下载中...", "Downloading..."))
+
+                self.root.after(0, do_update)
+
+        def download_task():
+            """Background download task"""
+            from src.core.downloader import FontReleaseDownloader
+
+            try:
+                downloader = FontReleaseDownloader()
+
+                # Custom download with progress callback
+                success, msg, zip_path = downloader.download_font(
+                    asset, update_progress
+                )
+
+                if download_state["cancelled"]:
+                    # Clean up downloaded file if cancelled
+                    if zip_path and os.path.exists(zip_path):
+                        try:
+                            os.remove(zip_path)
+                        except:
+                            pass
+                    self.root.after(0, lambda: dialog.destroy())
+                    self.root.after(
+                        0,
+                        lambda: self._log(
+                            t("download_cancelled", "下载已取消", "Download cancelled"),
+                            "warning",
+                        ),
+                    )
+                    return
+
+                download_state["success"] = success
+                download_state["zip_path"] = zip_path
+                download_state["error_msg"] = msg
+
+                # Update UI on main thread
+                self.root.after(0, lambda: on_download_complete())
+
+            except Exception as e:
+                download_state["success"] = False
+                download_state["error_msg"] = str(e)
+                self.root.after(0, lambda: on_download_complete())
+
+        def on_download_complete():
+            """Handle download completion - show result and install button"""
+            # Clear cancel button
+            for widget in btn_frame.winfo_children():
+                widget.destroy()
+
+            # Allow closing dialog now
+            dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+
+            if download_state["success"] and download_state["zip_path"]:
+                # Download successful - show install confirmation
+                progress_var.set(100)
+                progress_text_var.set("100%  " + t("complete", "完成", "Complete"))
+                status_var.set(
+                    t(
+                        "download_success",
+                        "下载成功！点击安装按钮开始安装字体。",
+                        "Download successful! Click Install to begin font installation.",
+                    )
+                )
+                status_label.config(foreground="green")
+
+                self._log(
+                    t(
+                        "download_complete",
+                        f"下载完成: {asset.name}",
+                        f"Download complete: {asset.name}",
+                    ),
+                    "success",
+                )
+
+                def on_install():
+                    """Start font installation"""
+                    dialog.destroy()
+                    self._install_downloaded_font(
+                        download_state["zip_path"], asset.name
+                    )
+
+                def on_close():
+                    """Close without installing"""
+                    dialog.destroy()
+                    self._log(
+                        t("install_skipped", "已跳过安装", "Installation skipped"),
+                        "warning",
+                    )
+
+                # Show install and close buttons
+                ttk.Button(
+                    btn_frame, text=t("install", "安装", "Install"), command=on_install
+                ).pack(side=tk.LEFT, padx=5)
+                ttk.Button(
+                    btn_frame, text=t("close", "关闭", "Close"), command=on_close
+                ).pack(side=tk.LEFT, padx=5)
+            else:
+                # Download failed - show error
+                progress_bar.config(style="")  # Reset style
+                status_var.set(t("download_failed", "下载失败", "Download failed"))
+                status_label.config(foreground="red")
+
+                error_msg = download_state["error_msg"] or t(
+                    "unknown_error", "未知错误", "Unknown error"
+                )
+                self._log(
+                    t(
+                        "download_error",
+                        f"下载失败: {error_msg}",
+                        f"Download failed: {error_msg}",
+                    ),
+                    "error",
+                )
+
+                # Show only close button
+                ttk.Button(
+                    btn_frame, text=t("close", "关闭", "Close"), command=dialog.destroy
+                ).pack(side=tk.LEFT, padx=5)
+
+        # Start download in background thread
         self._log(
             t(
-                "downloading_font",
-                f"正在下载: {asset.name}...",
-                f"Downloading: {asset.name}...",
+                "starting_download",
+                f"开始下载: {asset.name}...",
+                f"Starting download: {asset.name}...",
+            ),
+            "info",
+        )
+        threading.Thread(target=download_task, daemon=True).start()
+
+    def _install_downloaded_font(self, zip_path: str, asset_name: str):
+        """Install font from downloaded zip file"""
+        self._log(
+            t(
+                "installing_font",
+                f"正在安装字体: {asset_name}...",
+                f"Installing font: {asset_name}...",
             ),
             "info",
         )
 
         def task():
             try:
-                success, msg = download_and_install_fonts(asset)
+                success, msg = setup_fonts(zip_path)
                 self.root.after(0, lambda: self._on_task_complete(success, msg))
             except Exception as e:
                 self.root.after(0, lambda: self._on_task_complete(False, str(e)))
