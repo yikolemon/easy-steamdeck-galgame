@@ -155,6 +155,8 @@ class Config:
     def add_managed_game(cls, game: Dict[str, Any]):
         """Add a game to the managed games list"""
         games = cls.get_managed_games()
+        # Ensure the game is marked as managed by GUI
+        game["managed_by_gui"] = True
         # Check if game already exists (by name or path)
         for existing_game in games:
             if existing_game.get("name") == game.get("name") or existing_game.get(

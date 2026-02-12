@@ -20,6 +20,7 @@ from src.core.installers import (
     list_available_fonts,
 )
 from src.utils.locale import t, is_chinese
+from src.core.nonsteam_manager import NonSteamManager
 from src.core.game_launcher import get_locale_command
 from src.config import Config, TargetLanguage
 
@@ -400,11 +401,15 @@ class GUIApplication(ctk.CTk):
         )
         self.tab_locale = self.tabview.add(t("locale_tab", "语言环境", "Locale"))
         self.tab_fonts = self.tabview.add(t("font_tab", "字体安装", "Fonts"))
+        self.tab_nonsteam = self.tabview.add(
+            t("nonsteam_tab", "非Steam游戏", "Non-Steam Games")
+        )
 
         # Configure tab content
         self._create_launcher_tab()
         self._create_locale_tab()
         self._create_font_tab()
+        self._create_nonsteam_tab()
 
     def _create_locale_tab(self):
         """Create locale installation tab"""
@@ -552,6 +557,68 @@ class GUIApplication(ctk.CTk):
 
         # Spacer
         ctk.CTkLabel(options_frame, text="").grid(row=4, column=0, pady=5)
+
+    def _create_nonsteam_tab(self):
+        """Create non-Steam games management tab"""
+        tab = self.tab_nonsteam
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        # Scrollable container
+        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
+
+        # Description
+        desc_text = t(
+            "nonsteam_desc",
+            "管理非Steam游戏，支持添加、删除、修改游戏，并配置兼容层。",
+            "Manage non-Steam games with compatibility layer configuration.",
+        )
+        ctk.CTkLabel(scroll, text=desc_text, wraplength=700, justify="left").grid(
+            row=0, column=0, padx=20, pady=15, sticky="w"
+        )
+
+        # Games list frame
+        list_frame = ctk.CTkFrame(scroll)
+        list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        list_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            list_frame,
+            text=t("managed_games", "已管理的游戏", "Managed Games"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
+
+        # Games listbox (using CTkScrollableFrame for simplicity)
+        self.games_scroll = ctk.CTkScrollableFrame(list_frame, height=150)
+        self.games_scroll.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
+        self.games_scroll.grid_columnconfigure(0, weight=1)
+
+        # Buttons frame
+        btn_frame = ctk.CTkFrame(list_frame, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, padx=15, pady=(10, 15), sticky="w")
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("add_game", "添加游戏", "Add Game"),
+            command=self._add_nonsteam_game,
+        ).grid(row=0, column=0, padx=(0, 10))
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("edit_game", "编辑游戏", "Edit Game"),
+            command=self._edit_nonsteam_game,
+        ).grid(row=0, column=1, padx=(0, 10))
+
+        ctk.CTkButton(
+            btn_frame,
+            text=t("delete_game", "删除游戏", "Delete Game"),
+            command=self._delete_nonsteam_game,
+        ).grid(row=0, column=2)
+
+        # Refresh games list initially
+        self.after(200, self._refresh_games_list)
 
     def _create_launcher_tab(self):
         """Create game launcher options tab"""
@@ -1351,6 +1418,237 @@ class GUIApplication(ctk.CTk):
             self.clipboard_clear()
             self.clipboard_append(cmd)
             self._log(t("copied", "已复制到剪贴板", "Copied to clipboard"), "success")
+
+    def _refresh_games_list(self):
+        """Refresh the games list display"""
+        # Clear existing
+        for widget in self.games_scroll.winfo_children():
+            widget.destroy()
+
+        games = NonSteamManager.get_games()
+        if not games:
+            ctk.CTkLabel(
+                self.games_scroll,
+                text=t("no_games", "暂无管理的游戏", "No managed games"),
+                text_color="gray",
+            ).pack(pady=20)
+            return
+
+        self.games_radio_var = tk.StringVar()
+        for i, game in enumerate(games):
+            name = game.get("name", "Unknown")
+            compat = game.get("compat_layer", "None")
+            ctk.CTkRadioButton(
+                self.games_scroll,
+                text=f"{name} ({compat})",
+                variable=self.games_radio_var,
+                value=str(i),
+            ).pack(anchor="w", pady=2)
+
+    def _add_nonsteam_game(self):
+        """Show add game dialog"""
+        self._show_game_dialog(edit=False)
+
+    def _edit_nonsteam_game(self):
+        """Show edit game dialog"""
+        if not hasattr(self, "games_radio_var") or not self.games_radio_var.get():
+            show_warning(
+                self,
+                t("warning", "警告", "Warning"),
+                t("select_game_first", "请先选择游戏", "Please select a game first"),
+            )
+            return
+        self._show_game_dialog(edit=True)
+
+    def _delete_nonsteam_game(self):
+        """Delete selected game"""
+        if not hasattr(self, "games_radio_var") or not self.games_radio_var.get():
+            show_warning(
+                self,
+                t("warning", "警告", "Warning"),
+                t("select_game_first", "请先选择游戏", "Please select a game first"),
+            )
+            return
+
+        idx = int(self.games_radio_var.get())
+        games = NonSteamManager.get_games()
+        if idx >= len(games):
+            return
+
+        game = games[idx]
+        name = game.get("name", "Unknown")
+
+        if not ask_yes_no(
+            self,
+            t("confirm", "确认", "Confirm"),
+            t(
+                "confirm_delete",
+                f"确认删除游戏 '{name}'?",
+                f"Confirm delete game '{name}'?",
+            ),
+        ):
+            return
+
+        success, msg = NonSteamManager.remove_game(name)
+        if success:
+            self._log(
+                t("game_deleted", f"游戏已删除: {name}", f"Game deleted: {name}"),
+                "success",
+            )
+            show_success(self, t("success", "成功", "Success"), msg)
+        else:
+            self._log(msg, "error")
+            show_error(self, t("error", "错误", "Error"), msg)
+        self._refresh_games_list()
+
+    def _show_game_dialog(self, edit: bool = False):
+        """Show add/edit game dialog"""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(
+            t(
+                "add_game" if not edit else "edit_game",
+                "添加游戏" if not edit else "编辑游戏",
+                "Add Game" if not edit else "Edit Game",
+            )
+        )
+        dialog.geometry("500x400")
+        dialog.transient(self)
+
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(0, weight=1)
+
+        scroll = ctk.CTkScrollableFrame(dialog)
+        scroll.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+
+        # Get compatibility layers
+        compat_layers = NonSteamManager.get_compatibility_layers()
+
+        # Current game data if editing
+        current_game = None
+        if edit:
+            idx = int(self.games_radio_var.get())
+            games = NonSteamManager.get_games()
+            if idx < len(games):
+                current_game = games[idx]
+
+        # Name
+        ctk.CTkLabel(scroll, text=t("game_name", "游戏名称:", "Game Name:")).pack(
+            anchor="w", pady=(0, 5)
+        )
+        name_var = tk.StringVar(
+            value=current_game.get("name", "") if current_game else ""
+        )
+        ctk.CTkEntry(scroll, textvariable=name_var).pack(fill="x", pady=(0, 15))
+
+        # Executable path
+        ctk.CTkLabel(
+            scroll, text=t("exe_path", "可执行文件路径:", "Executable Path:")
+        ).pack(anchor="w", pady=(0, 5))
+        exe_var = tk.StringVar(
+            value=current_game.get("exe_path", "") if current_game else ""
+        )
+        exe_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        exe_frame.pack(fill="x", pady=(0, 5))
+        exe_frame.grid_columnconfigure(0, weight=1)
+        ctk.CTkEntry(exe_frame, textvariable=exe_var).grid(row=0, column=0, sticky="ew")
+        ctk.CTkButton(
+            exe_frame,
+            text=t("browse", "浏览...", "Browse..."),
+            width=80,
+            command=lambda: exe_var.set(filedialog.askopenfilename()),
+        ).grid(row=0, column=1, padx=(10, 0))
+
+        # Compatibility layer
+        ctk.CTkLabel(
+            scroll, text=t("compat_layer", "兼容层:", "Compatibility Layer:")
+        ).pack(anchor="w", pady=(0, 5))
+        compat_var = tk.StringVar(
+            value=current_game.get(
+                "compat_layer", compat_layers[0] if compat_layers else ""
+            )
+            if current_game
+            else compat_layers[0]
+            if compat_layers
+            else ""
+        )
+        ctk.CTkComboBox(scroll, values=compat_layers, variable=compat_var).pack(
+            fill="x", pady=(0, 15)
+        )
+
+        # Properties (optional)
+        ctk.CTkLabel(
+            scroll,
+            text=t("properties", "启动属性 (可选):", "Launch Properties (Optional):"),
+        ).pack(anchor="w", pady=(0, 5))
+        props_var = tk.StringVar(
+            value=current_game.get("properties", {}).get("launch_options", "")
+            if current_game
+            else ""
+        )
+        ctk.CTkEntry(
+            scroll, textvariable=props_var, placeholder_text="e.g., --fullscreen"
+        ).pack(fill="x", pady=(0, 15))
+
+        def on_save():
+            name = name_var.get().strip()
+            exe = exe_var.get().strip()
+            compat = compat_var.get()
+            props = props_var.get().strip()
+
+            if not name or not exe:
+                show_warning(
+                    dialog,
+                    t("warning", "警告", "Warning"),
+                    t("fill_required", "请填写必填字段", "Please fill required fields"),
+                )
+                return
+
+            game_data = {
+                "name": name,
+                "exe_path": exe,
+                "compat_layer": compat,
+                "properties": {"launch_options": props} if props else {},
+            }
+
+            if edit and current_game:
+                # For edit, remove old and add new
+                old_name = current_game["name"]
+                NonSteamManager.remove_game(old_name)
+                success, msg = NonSteamManager.add_game(
+                    name, exe, compat, game_data["properties"]
+                )
+            else:
+                success, msg = NonSteamManager.add_game(
+                    name, exe, compat, game_data["properties"]
+                )
+
+            if success:
+                self._log(
+                    t("game_saved", f"游戏已保存: {name}", f"Game saved: {name}"),
+                    "success",
+                )
+                show_success(dialog, t("success", "成功", "Success"), msg)
+                dialog.destroy()
+                self._refresh_games_list()
+            else:
+                show_error(dialog, t("error", "错误", "Error"), msg)
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.grid(row=1, column=0, pady=15)
+
+        ctk.CTkButton(btn_frame, text=t("save", "保存", "Save"), command=on_save).pack(
+            side="left", padx=10
+        )
+        ctk.CTkButton(
+            btn_frame, text=t("cancel", "取消", "Cancel"), command=dialog.destroy
+        ).pack(side="left", padx=10)
+
+        # Center and grab
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 500) // 2
+        y = self.winfo_y() + (self.winfo_height() - 400) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.after(100, lambda: dialog.grab_set())
 
 
 def main():
